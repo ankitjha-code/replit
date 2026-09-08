@@ -1,0 +1,658 @@
+.projects,
+.project-detail,
+.landing,
+.account {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.projects__header,
+.project-detail__header,
+.account__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.projects h1,
+.project-detail h1,
+.account h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.projects__subtitle,
+.project-detail__slug {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.project-detail__slug {
+  font-family: var(--font-mono);
+}
+
+.projects__note {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.projects__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgb(248 81 73 / 10%);
+  border: 1px solid var(--status-down);
+  border-radius: var(--radius-md);
+}
+
+.projects__error p {
+  margin: 0;
+  color: var(--status-down);
+  font-size: 13px;
+}
+
+.projects__empty {
+  padding: var(--space-8);
+  text-align: center;
+  background: var(--bg-raised);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.projects__empty h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 16px;
+}
+
+.projects__empty p {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* --- the project list ---------------------------------------------------- */
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  height: 100%;
+  padding: var(--space-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.project-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-overlay);
+}
+
+.project-card__name {
+  font-weight: 600;
+}
+
+.project-card__slug {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.project-card__description {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: 13px;
+  /* Two lines, so one long description cannot make a card tower over its
+     neighbours in the grid. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.project-card__meta {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* --- creating ------------------------------------------------------------ */
+
+.new-project {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.link-button {
+  margin-bottom: var(--space-4);
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.button-primary--inline {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* --- one project --------------------------------------------------------- */
+
+.project-detail__description {
+  margin: 0 0 var(--space-6);
+  color: var(--text-secondary);
+}
+
+.project-detail__facts {
+  display: flex;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.project-detail__facts dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.project-detail__facts dd {
+  margin: var(--space-1) 0 0;
+  font-size: 13px;
+}
+
+.danger-zone {
+  margin-top: var(--space-8);
+  padding: var(--space-4);
+  border: 1px solid var(--status-down);
+  border-radius: var(--radius-md);
+}
+
+.danger-zone h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
+  color: var(--status-down);
+}
+
+.danger-zone p {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.danger-zone__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.button-danger {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--status-down);
+  border-radius: var(--radius-sm);
+  color: var(--status-down);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-danger:hover:not(:disabled) {
+  background: var(--status-down);
+  color: #fff;
+}
+
+.button-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- signed out ---------------------------------------------------------- */
+
+.landing {
+  padding: var(--space-8) 0;
+  text-align: center;
+}
+
+.landing h1 {
+  margin: 0 0 var(--space-3);
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.landing p {
+  margin: 0 auto var(--space-6);
+  max-width: 460px;
+  color: var(--text-secondary);
+}
+
+.landing__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.project-detail__header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* --- project sections (files, secrets) ----------------------------------- */
+
+.project-section {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.project-section h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
+}
+
+.project-section__hint {
+  margin: 0 0 var(--space-3);
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/*
+ * A commit's file changes.
+ *
+ * The kind is a word rather than a symbol in a column: a plus and a minus are
+ * only obvious to somebody who already knows what they mean, and this page is
+ * also read by people who have never used git.
+ */
+.project-section__changes {
+  width: 100%;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-muted));
+}
+
+.project-section__changes li {
+  overflow-wrap: anywhere;
+}
+
+.project-section__change {
+  display: inline-block;
+  min-width: 5.5em;
+  color: var(--text-muted);
+}
+
+.project-section__change--added {
+  color: var(--success, #4f9d69);
+}
+
+.project-section__change--modified {
+  color: var(--warning, #c08a3e);
+}
+
+.project-section__change--removed {
+  color: var(--danger, #d0554f);
+}
+
+.project-section__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.project-section__usage,
+.project-section__note,
+.project-section__item-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/*
+ * A variable's value, shown in full.
+ *
+ * Monospaced because these are read character by character: a port number, a
+ * URL, a flag. Wrapping rather than truncating, because a value cut off at the
+ * edge of a row is one somebody has to go elsewhere to read, which is the
+ * problem this whole panel exists to solve.
+ */
+/*
+ * Connection details, as pairs.
+ *
+ * A grid rather than a list, because these are read by picking out one value at
+ * a time to paste into a field somewhere else, not read through in order.
+ */
+.project-section__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0;
+  font-size: 13px;
+}
+
+.project-section__facts > div {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: baseline;
+}
+
+.project-section__facts dt {
+  color: var(--text-muted);
+}
+
+.project-section__facts dd {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  overflow-wrap: anywhere;
+}
+
+.project-section__item-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-muted));
+  overflow-wrap: anywhere;
+}
+
+.project-section__error {
+  margin: var(--space-2) 0;
+  color: var(--danger, #d0554f);
+  font-size: 13px;
+}
+
+.project-section__form {
+  display: grid;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: var(--space-3);
+}
+
+.project-section__form label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.project-section__form input {
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-1, 4px);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.project-section__form button {
+  grid-column: 3;
+}
+
+.project-section__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-section__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.project-section__item-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * What a build printed.
+ *
+ * Preformatted and scrollable rather than wrapped: build output is written to a
+ * terminal, and reflowing it turns a table of package versions into a wall.
+ * Bounded in height so one verbose build does not push everything else off the
+ * page.
+ */
+.build-log {
+  width: 100%;
+  max-height: 24rem;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken, #0d1117);
+  color: var(--text-muted);
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/*
+ * A sub-heading inside a settings section.
+ *
+ * For the one section that holds two related but different things: the address
+ * the platform gives a project, and a domain of the owner's own.
+ */
+.project-section__subheading {
+  margin: var(--space-4) 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/*
+ * One line of an application's output.
+ *
+ * Errors are marked rather than coloured differently for their own sake: the
+ * commonest reason anybody opens a log is to find the one line that is not
+ * ordinary, and scanning for it should not require reading.
+ */
+.log-line {
+  display: block;
+}
+
+.log-line--error {
+  color: var(--danger, #f87171);
+}
+
+/*
+ * One measurement, as a bar and a number.
+ *
+ * Both, because neither is enough alone: a bar shows how close something is to
+ * its ceiling at a glance, and the number is what somebody quotes when they ask
+ * for more.
+ */
+.meter {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.meter__label {
+  font-weight: 500;
+}
+
+.meter__track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.meter__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent, #60a5fa);
+}
+
+/* Near the ceiling is the one thing on this page worth colouring. */
+.meter__fill--full {
+  background: var(--danger, #f87171);
+}
+
+.meter__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Recent processor readings.
+ *
+ * Deliberately not a charting library: what somebody needs from a trend here is
+ * whether the line is going up.
+ */
+.trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 2.5rem;
+  margin-top: var(--space-2);
+}
+
+.trend__bar {
+  flex: 1 1 auto;
+  min-width: 2px;
+  background: var(--accent, #60a5fa);
+  border-radius: 1px 1px 0 0;
+}
+
+/*
+ * Whether the application answered.
+ *
+ * Four states rather than two, because "not checked" and "not answering" are
+ * different facts and colouring them the same would raise an alarm about a
+ * project nobody has started.
+ */
+.health {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.health--healthy {
+  color: var(--success, #4ade80);
+}
+
+.health--unhealthy,
+.health--unreachable {
+  color: var(--danger, #f87171);
+}
+
+.health--unknown {
+  color: var(--text-muted);
+}
+
+.monitoring__live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/*
+ * How much of the platform an account is using.
+ *
+ * A line of context beside a list of projects, not a panel. It appears only when
+ * something is actually running, so it never takes up room to say nothing.
+ */
+.account-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.account-usage__item--full {
+  color: var(--danger, #f87171);
+}
+
+/*
+ * The account page.
+ *
+ * Almost entirely the vocabulary the project pages already use — a section, a
+ * list, a danger zone — because it is the same kind of page and inventing a
+ * second set of names for the same shapes is how two stylesheets start to
+ * disagree. Only two things here are genuinely new.
+ */
+
+/* A checkbox that reads as a sentence rather than as a form field. */
+.account__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.account__check input {
+  width: auto;
+  margin: 0;
+}
+
+/*
+ * One session, with its controls on the right.
+ *
+ * Wraps rather than truncates: a user-agent description and an address are the
+ * two things somebody is reading this list to compare, and a narrow window is
+ * exactly where a stolen session would be noticed.
+ */
+.account .project-section__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.account .project-section__item-meta {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}

@@ -1,0 +1,30 @@
+# What Prometheus collects, and how often.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # The platform itself. The token is written to this file from METRICS_TOKEN
+  # when the container starts; the endpoint answers 404 without it.
+  - job_name: platform
+    authorization:
+      credentials_file: /prometheus/metrics-token
+    static_configs:
+      - targets: ['__EDGE_GATEWAY__:4000']
+
+  # The server: CPU, memory, disk, network, and the backup status file.
+  - job_name: node
+    static_configs:
+      - targets: ['__EDGE_GATEWAY__:9100']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

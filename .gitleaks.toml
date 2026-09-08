@@ -1,0 +1,22 @@
+# Secret scanning (gitleaks). The default rules, minus values that are not
+# secrets. Each exception says why; add new ones only with a reason.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets"
+regexes = [
+  # The example nonce from the WebSocket specification (RFC 6455), used in tests.
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+  # Passwords of throwaway accounts that test scripts create and delete.
+  '''a-long-smoke-passphrase-1''',
+  '''a-long-production-passphrase-1''',
+  '''a-long-load-test-passphrase-1''',
+]
+paths = [
+  # Local settings files, all git-ignored; never committed.
+  '''(^|/)\.env$''',
+  '''deploy/.*\.local\.env$''',
+  '''deploy/production\.env$''',
+  '''deploy/api\.env$''',
+]

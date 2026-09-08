@@ -1,0 +1,95 @@
+# Production reverse proxy: HTTPS for everything, and the web app's files.
+#
+#   {$PLATFORM_DOMAIN}            the workspace and its API
+#   <projectId>.{$PREVIEW_DOMAIN}  development previews     -> preview listener
+#   <label>.{$APP_DOMAIN}          deployments              -> deployment listener
+#   any verified custom domain     deployments              -> deployment listener
+#
+# Certificates: the platform domain gets one normally. Everything else is issued
+# on demand, per hostname, and only after the control plane says yes at
+# /internal/tls-authorize — so a request for a name nobody here owns never makes
+# this installation ask a certificate authority about it.
+#
+# TLS_MODE=acme  (default) real certificates from Let's Encrypt; needs DNS for
+#                every name pointing here and ports 80/443 open.
+# TLS_MODE=local Caddy's own local CA, for testing the production setup on one
+#                machine without a public domain.
+
+{
+	admin off
+	import /etc/caddy/tls-{$TLS_MODE:acme}.caddy
+	# Let's Encrypt ended its OCSP service in 2025; stapling only produces
+	# warnings now.
+	ocsp_stapling off
+
+	on_demand_tls {
+		ask http://{$UPSTREAM_HOST}:{$API_PORT:4000}/internal/tls-authorize
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+(proxy_headers) {
+	header_up X-Real-IP {remote_host}
+}
+
+{$PLATFORM_DOMAIN} {
+	encode zstd gzip
+
+	# Never public: the certificate question and the metrics page are for
+	# things inside this deployment only.
+	@internal path /internal/* /metrics /metrics/*
+	handle @internal {
+		respond 404
+	}
+
+	@api path /api/* /health/* /ws/*
+	handle @api {
+		reverse_proxy {$UPSTREAM_HOST}:{$API_PORT:4000} {
+			import proxy_headers
+		}
+	}
+
+	handle {
+		root * /srv/web
+		header {
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options nosniff
+			Referrer-Policy no-referrer
+			X-Frame-Options DENY
+			# What the workspace may load. Scripts only from itself; the editor's
+			# workers come from blob: URLs and it sets styles inline; the preview
+			# is framed from its own hostnames; nothing may frame the workspace.
+			Content-Security-Policy "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://{$PLATFORM_DOMAIN}; frame-src https://*.{$PREVIEW_DOMAIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		}
+		# Built assets carry a content hash in their name, so they never change.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Everything that is not the platform domain: previews, deployments and custom
+# domains, each certificate approved by the control plane first.
+https:// {
+	tls {
+		on_demand
+	}
+
+	@preview host *.{$PREVIEW_DOMAIN}
+	handle @preview {
+		reverse_proxy {$UPSTREAM_HOST}:{$PREVIEW_PORT:4100} {
+			import proxy_headers
+		}
+	}
+
+	handle {
+		reverse_proxy {$UPSTREAM_HOST}:{$DEPLOYMENT_PORT:4200} {
+			import proxy_headers
+		}
+	}
+}

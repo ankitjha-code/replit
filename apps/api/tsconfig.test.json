@@ -1,0 +1,14 @@
+{
+  // Type checking for tests. They are checked but never emitted, so a broken
+  // test signature fails the build rather than surfacing only at run time.
+  // rootDir is widened to the package because tests and tool configuration
+  // live beside src, not inside it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "tests/**/*", "vitest.config.ts", "prisma.config.ts"],
+  "exclude": ["node_modules", "dist", "src/generated"]
+}

@@ -1,0 +1,290 @@
+# Local infrastructure for the platform's control plane.
+#
+#   pnpm infra:up      start   (postgres, minio, proxy)
+#   pnpm infra:down    stop
+#   pnpm infra:reset   stop and destroy all data
+#
+# The application itself is NOT defined here. The API and web client run on the
+# host via `pnpm dev`, which keeps the edit-reload loop fast; the proxy reaches
+# them through host.docker.internal.
+#
+# Every published port binds to 127.0.0.1 only. None of these services should
+# ever be reachable from another machine on the network.
+#
+# Credentials below are development defaults, deliberately obvious. They are
+# overridden by the root .env, which is never committed.
+
+name: replit-platform
+
+services:
+  # ---------------------------------------------------------------------------
+  # Platform database. Holds users, projects, permissions, file metadata,
+  # runtime and deployment metadata. NOT the database a user's application
+  # gets: that is provisioned separately in Task 26.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-platform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-platform}
+      # Deterministic collation, so index ordering does not depend on the host.
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5442}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-platform} -d ${POSTGRES_DB:-platform}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - platform
+
+  # ---------------------------------------------------------------------------
+  # The database a user's application gets. NOT the platform's.
+  #
+  # A second PostgreSQL server, not a second database inside the first one.
+  # That is the whole point: the platform's users, sessions and secrets are in a
+  # different server process, so a project's SQL reaches nothing of the
+  # platform's because there is nothing of the platform's here to reach. Role
+  # permissions are not what makes that true, which means a mistake in them
+  # cannot undo it.
+  #
+  # One database and one role per project live inside this instance. Projects
+  # are separated from each other by those roles, which is a real boundary but a
+  # weaker one than the separation above.
+  # ---------------------------------------------------------------------------
+  userdb:
+    image: postgres:17-alpine
+    container_name: platform-userdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USER_DATABASE_ADMIN_USER:-userdb_admin}
+      POSTGRES_PASSWORD: ${USER_DATABASE_ADMIN_PASSWORD:-userdb_dev_only}
+      # The admin database. Project databases are created beside it.
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      # Loopback only, for the control plane to provision through. Application
+      # containers do not come in this way; they reach it over the runtime
+      # network below, by container name.
+      - '127.0.0.1:${USER_DATABASE_PORT:-5452}:5432'
+    volumes:
+      - userdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${USER_DATABASE_ADMIN_USER:-userdb_admin} -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      # Deliberately NOT on the platform network. The control plane reaches it
+      # through the published loopback port instead, so nothing on the
+      # platform's own network can see it and it cannot see anything there.
+      - runtimes
+
+  # ---------------------------------------------------------------------------
+  # Object storage for project assets and, later, build artifacts.
+  # S3-compatible, so the StorageProvider written against it in Task 23 works
+  # unchanged against any S3 implementation.
+  # ---------------------------------------------------------------------------
+  minio:
+    # From MinIO's own registry: Docker Hub no longer serves MinIO images, so a
+    # fresh machine (or a CI runner) cannot pull them from there.
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: platform-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-platform}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-platform_dev_only}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-9101}
+    ports:
+      - '127.0.0.1:${MINIO_API_PORT:-9100}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9101}:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - platform
+
+  # ---------------------------------------------------------------------------
+  # One-shot: creates the asset bucket and denies anonymous access to it.
+  # Idempotent, so it is safe to run on every `up`.
+  #
+  # Behind a profile so it is not part of the default `up` set: a container
+  # that runs to completion makes `up --wait` report failure, which would turn
+  # a healthy stack into a non-zero exit. `pnpm infra:up` runs it explicitly
+  # after the stack is healthy, and surfaces its real exit code.
+  # ---------------------------------------------------------------------------
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    # No container_name: this service is started with `compose run`, which
+    # names each invocation itself.
+    profiles: ['init']
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-platform-assets}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-platform}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-platform_dev_only}
+    entrypoint: ['/bin/sh', '/init/create-bucket.sh']
+    volumes:
+      - ./minio/create-bucket.sh:/init/create-bucket.sh:ro
+    restart: 'no'
+    networks:
+      - platform
+
+  # ---------------------------------------------------------------------------
+  # Reverse proxy. Today it fronts the platform on one origin. From Task 20 it
+  # also routes per-project preview traffic, and from Task 39 deployments.
+  # ---------------------------------------------------------------------------
+  proxy:
+    image: caddy:2.11-alpine
+    container_name: platform-proxy
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${PROXY_HTTP_PORT:-8080}:8080'
+    environment:
+      # The API and web client run on the host, not in Compose.
+      API_UPSTREAM: ${PROXY_API_UPSTREAM:-host.docker.internal:4000}
+      WEB_UPSTREAM: ${PROXY_WEB_UPSTREAM:-host.docker.internal:5173}
+      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:-preview.localhost}
+      DEPLOY_DOMAIN: ${DEPLOY_DOMAIN:-app.localhost}
+      # Deployments are answered by their own listener on the host, for the
+      # same reason previews are: what it serves is somebody else's code, and
+      # it must never be reachable on the platform's origin.
+      DEPLOY_UPSTREAM: ${PROXY_DEPLOY_UPSTREAM:-host.docker.internal:4200}
+      PROXY_HTTP_PORT: ${PROXY_HTTP_PORT:-8080}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # host.docker.internal is native on Docker Desktop; this line makes the
+    # same name work on a plain Linux daemon.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8080/__proxy/health']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - platform
+
+  # ---------------------------------------------------------------------------
+  # Redis is NOT started by default. Nothing in the platform needs a queue,
+  # pub/sub or shared presence yet, and running it now would be infrastructure
+  # kept alive for no reason.
+  #
+  # It is defined so the day a workload justifies it (build jobs in Task 46,
+  # cross-process presence in Task 32) it is one flag away:
+  #
+  #   docker compose --profile queue up -d
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: platform-redis
+    profiles: ['queue']
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6389}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - platform
+
+  # ---------------------------------------------------------------------------
+  # A mail server for development, which catches everything and delivers
+  # nothing.
+  #
+  # Address verification and password reset both put a link in somebody's inbox,
+  # and both are impossible to work on without somewhere for that message to go.
+  # Mailpit accepts SMTP on 1025 and shows what arrived on a web page, so the
+  # links can be opened without a real mail account and without any risk of a
+  # test message reaching a real address.
+  #
+  # Started by default rather than behind a profile: unlike Redis, the features
+  # that need it exist now, and an installation without mail has to refuse them.
+  # ---------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: platform-mailpit
+    restart: unless-stopped
+    environment:
+      # Everything stays in the container's memory and goes with it. Nothing
+      # here is worth a volume, and a development mailbox that survives a reset
+      # is a development mailbox nobody empties.
+      MP_MAX_MESSAGES: '500'
+      MP_SMTP_AUTH_ACCEPT_ANY: '1'
+      MP_SMTP_AUTH_ALLOW_INSECURE: '1'
+    ports:
+      # Loopback only, like everything else here. A mail server reachable from
+      # the network is a mail server somebody else will relay through.
+      - '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - platform
+
+# Named volumes, not bind mounts. Project and platform data must survive
+# `docker compose down`; only `down -v` (pnpm infra:reset) destroys it.
+volumes:
+  postgres_data:
+    name: platform_postgres_data
+  userdb_data:
+    name: platform_userdb_data
+  minio_data:
+    name: platform_minio_data
+  redis_data:
+    name: platform_redis_data
+  caddy_data:
+    name: platform_caddy_data
+  caddy_config:
+    name: platform_caddy_config
+
+networks:
+  # Infrastructure network. Project runtime containers never join this one, or
+  # user code would be able to reach the platform database directly.
+  platform:
+    name: platform_net
+    driver: bridge
+
+  # The user database's own network, and the name project networks are derived
+  # from.
+  #
+  # Project containers are NOT on this one. Each project gets a network of its
+  # own, named `<RUNTIME_NETWORK>-<project id>`, created by the execution
+  # provider: everything on a bridge network can reach everything else on it by
+  # name, so a single shared network would let any project's code connect to
+  # every other project's container. That is not a privilege that could be
+  # dropped — it is a route, and the only way to remove it is to not have it.
+  #
+  # The database server is then attached to each project network deliberately,
+  # one project at a time, which is what puts back the one route a project is
+  # supposed to have.
+  runtimes:
+    name: ${RUNTIME_NETWORK:-platform-runtimes}
+    driver: bridge

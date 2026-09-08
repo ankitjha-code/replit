@@ -1,0 +1,933 @@
+/*
+ * The workspace fills its container rather than flowing in the page, so the
+ * panels can be sized against the viewport and the console can sit at the
+ * bottom without the page scrolling.
+ */
+.workspace {
+  --splitter-size: 5px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.workspace--message {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--text-secondary);
+}
+
+/* --- toolbar ------------------------------------------------------------- */
+
+.workspace-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+  padding: 0 var(--space-3);
+  height: 40px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.workspace-toolbar__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.workspace-toolbar__back:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.workspace-toolbar__identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.workspace-toolbar__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-toolbar__slug {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.workspace-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/*
+ * Who else is in the project.
+ *
+ * Sits in the toolbar between the runtime state and the actions, and renders
+ * nothing at all when nobody else is here. A row of initials rather than
+ * pictures: the platform has never asked anybody for an avatar, and a generated
+ * one would be decoration standing in for information nobody gave.
+ */
+.presence {
+  display: flex;
+  align-items: center;
+  /* Overlapping slightly, so a crowd stays a fixed-ish width rather than
+     pushing the toolbar's actions off the end. */
+  gap: calc(var(--space-1) * -1);
+  margin-left: var(--space-3);
+}
+
+.presence__member {
+  display: inline-flex;
+}
+
+.presence__initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--surface);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  /* Deliberately not a colour per person. A colour would have to be derived
+     from the account, and a derived colour is a guess that looks like a
+     setting. */
+}
+
+.runtime-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.runtime-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  /* Grey, because nothing is running. A green dot here would be a lie. */
+  background: var(--text-muted);
+}
+
+/* --- panel grid ---------------------------------------------------------- */
+
+.workspace-body {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+.workspace-center {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.panel-frame {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.panel-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  height: 30px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.panel-frame__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.panel-frame__actions {
+  margin-left: auto;
+}
+
+.panel-frame__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-frame__toggle:hover {
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+.panel-frame__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: 100%;
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.panel-placeholder__headline {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.panel-placeholder__detail {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* --- splitters ----------------------------------------------------------- */
+
+.splitter {
+  background: transparent;
+  border: none;
+  position: relative;
+  z-index: 1;
+}
+
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+
+.splitter--vertical {
+  cursor: col-resize;
+}
+
+.splitter--horizontal {
+  cursor: row-resize;
+}
+
+/* The visible divider is thin, but the area that responds to a pointer is
+   wider, because a five-pixel target is a poor one. */
+.splitter::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+}
+
+.collapsed-rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-1);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  /* Reads bottom-to-top so a narrow vertical rail still holds its label. */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.collapsed-rail--horizontal {
+  writing-mode: horizontal-tb;
+  transform: none;
+}
+
+.collapsed-rail:hover {
+  color: var(--text-primary);
+  background: var(--bg-base);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * On a narrow screen the three columns cannot coexist. The panels stack and
+ * scroll instead, which is worse than the full layout but usable, whereas
+ * three 100px columns would not be.
+ */
+@media (max-width: 800px) {
+  .workspace-body {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .workspace-center {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-frame {
+    min-height: 220px;
+  }
+
+  .splitter,
+  .collapsed-rail {
+    display: none;
+  }
+}
+
+/* --- the file explorer --------------------------------------------------- */
+
+.files-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.files-panel__toolbar {
+  display: flex;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.icon-button {
+  padding: 2px var(--space-2);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.files-panel__note {
+  padding: var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.files-panel__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--status-down);
+  font-size: 12px;
+  background: rgb(248 81 73 / 10%);
+}
+
+.files-panel__error p {
+  margin: 0 0 var(--space-2);
+}
+
+.files-panel__new {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.files-panel__new-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.files-panel__new-in {
+  font-family: var(--font-mono);
+}
+
+.file-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-1) 0;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-2);
+  height: 22px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-row:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.file-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.file-row--selected {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.file-row__twisty {
+  width: 10px;
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/*
+ * A small colour-coded square rather than an icon font. It carries no meaning
+ * on its own, which is why it is hidden from assistive technology: the name
+ * beside it is what identifies the file.
+ */
+.file-row__icon {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--text-muted);
+}
+
+.file-row__icon--folder {
+  background: var(--accent);
+}
+.file-row__icon--typescript,
+.file-row__icon--javascript {
+  background: #d6b016;
+}
+.file-row__icon--json,
+.file-row__icon--yaml,
+.file-row__icon--toml {
+  background: #7d8590;
+}
+.file-row__icon--html,
+.file-row__icon--css {
+  background: #4a9eda;
+}
+.file-row__icon--markdown {
+  background: #6ea86e;
+}
+.file-row__icon--python {
+  background: #4b8bbe;
+}
+.file-row__icon--binary {
+  background: #8b5cf6;
+}
+
+.file-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--space-1);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.files-panel__confirm {
+  flex: 0 0 auto;
+  padding: var(--space-3);
+  background: var(--bg-overlay);
+  border-top: 1px solid var(--status-down);
+}
+
+.files-panel__confirm p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.files-panel__confirm-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.files-panel__confirm .button-danger {
+  padding: 2px var(--space-3);
+  font-size: 12px;
+}
+
+/* --- the editor ---------------------------------------------------------- */
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.editor-panel__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.editor-panel__editor {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.code-editor {
+  height: 100%;
+  width: 100%;
+}
+
+.editor-panel__note {
+  padding: var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.editor-panel__message {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: rgb(210 153 34 / 12%);
+  border-bottom: 1px solid var(--status-warn);
+  color: var(--status-warn);
+  font-size: 12px;
+}
+
+/* --- tabs ---------------------------------------------------------------- */
+
+.tab-strip {
+  display: flex;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  height: 30px;
+  background: transparent;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab--active {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  /* A top edge rather than a bottom one, so the active tab reads as joined to
+     the editor below it. */
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.tab__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab__close:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+/* --- status bar ---------------------------------------------------------- */
+
+.editor-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+  padding: 0 var(--space-3);
+  height: 26px;
+  background: var(--bg-overlay);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.editor-status__path {
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-status__spacer {
+  flex: 1 1 auto;
+}
+
+.editor-status__state {
+  white-space: nowrap;
+}
+
+.editor-status .icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- conflicts and save state -------------------------------------------- */
+
+.editor-conflict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+  background: rgb(210 153 34 / 12%);
+  border-bottom: 1px solid var(--status-warn);
+}
+
+.editor-conflict__text {
+  margin: 0;
+  color: var(--status-warn);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.editor-conflict__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.editor-status__state--warning {
+  color: var(--status-warn);
+}
+
+/* --- runtime state ------------------------------------------------------- */
+
+.runtime-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * One colour per state, and no colour that overstates one. Grey is the
+ * default because "nothing is running" is the truth for a project nobody has
+ * started, and a green dot there would be a lie.
+ */
+.runtime-chip--idle .runtime-chip__dot {
+  background: var(--text-muted);
+}
+
+.runtime-chip--pending .runtime-chip__dot {
+  background: var(--accent, #d09b3a);
+}
+
+.runtime-chip--running .runtime-chip__dot {
+  background: var(--success, #3fa66a);
+}
+
+.runtime-chip--failed .runtime-chip__dot {
+  background: var(--danger, #d0554f);
+}
+
+.runtime-controls__message {
+  overflow: hidden;
+  max-width: 28ch;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- terminal ------------------------------------------------------------ */
+
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: #0b0d10;
+}
+
+/*
+ * The screen takes the space and the status line sits under it, so a message
+ * about a dead connection never covers the output someone is reading.
+ */
+.terminal-panel__screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.terminal-panel__screen .xterm {
+  height: 100%;
+}
+
+.terminal-panel__status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* --- preview ------------------------------------------------------------- */
+
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.preview-panel__bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.preview-panel__spacer {
+  flex: 1 1 auto;
+}
+
+.preview-panel__address {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* White, because a page with no background of its own expects to be on one. */
+.preview-panel__frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 0;
+  background: #ffffff;
+}
+
+.preview-panel__message {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* --- console ------------------------------------------------------------- */
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: #0b0d10;
+}
+
+.console-panel__tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+}
+
+.console-panel__tab {
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.console-panel__tab--active {
+  border-bottom-color: var(--accent, #d09b3a);
+  color: var(--text-primary);
+}
+
+/* Pushed to the right: the tabs are navigation, these act on what is shown. */
+.console-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  min-width: 0;
+}
+
+.console-panel__command {
+  overflow: hidden;
+  max-width: 32ch;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.console-panel__command-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.console-panel__command-input {
+  width: 28ch;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.console-panel__status {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.console-panel__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.console-panel__output {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: var(--space-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  /* Output arrives as chunks, not lines: preserving whitespace is what makes
+     a program's own line breaks the ones that show. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.console-panel__line--stdout {
+  color: #d5d9df;
+}
+
+.console-panel__line--stderr {
+  color: var(--danger, #d0554f);
+}
+
+.console-panel__note,
+.console-panel__error {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.console-panel__error {
+  color: var(--danger, #d0554f);
+}

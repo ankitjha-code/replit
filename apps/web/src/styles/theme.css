@@ -1,0 +1,73 @@
+/*
+ * Design tokens for the workspace shell.
+ *
+ * A code editor is a dark-first surface, so the dark palette is the base and
+ * the light theme is the override. Every colour used by the app resolves
+ * through a token here.
+ */
+:root {
+  color-scheme: dark;
+
+  --bg-base: #0d1117;
+  --bg-raised: #161b22;
+  --bg-overlay: #1c2128;
+  --bg-input: #010409;
+
+  --border-subtle: #21262d;
+  --border-strong: #30363d;
+
+  --text-primary: #e6edf3;
+  --text-secondary: #9198a1;
+  --text-muted: #6e7681;
+
+  --accent: #f26207;
+  --accent-hover: #ff7b1c;
+
+  --status-ok: #3fb950;
+  --status-warn: #d29922;
+  --status-down: #f85149;
+
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,440 @@
+# Production deployment: the whole platform on one Linux server.
+#
+#   cp deploy/production.env.example deploy/production.env   # then fill it in
+#   docker compose --env-file deploy/production.env -f deploy/docker-compose.yml up -d --build
+#
+# What runs:
+#   proxy     Caddy: HTTPS for every hostname, serves the web app   (ports 80, 443)
+#   api       the control plane                                     (host network)
+#   worker    background jobs, sweeps, alerts, domain re-checks     (host network)
+#   migrate   applies database migrations with the api image, then exits
+#   postgres  the platform's database
+#   userdb    the separate server projects get their databases on
+#   minio     object storage: snapshots, git history, assets, builds
+#   redis     job nudges and cross-process events
+#   backup    scheduled, verified dumps of both databases
+#
+# Why the api and worker use the host's network: they start users' containers,
+# each on a network of its own, and must reach them directly. From the host's
+# network every container address is routable; from inside a container none
+# would be. They listen only on the edge network's gateway address, so nothing
+# they serve is exposed on the server's public interfaces; the proxy is the
+# only way in.
+#
+# Nothing but the proxy publishes a port.
+
+name: ${STACK:-platform}
+
+x-app: &app
+  image: ${STACK:-platform}-api:${VERSION:-latest}
+  build:
+    context: ..
+    target: api
+  restart: unless-stopped
+  network_mode: host
+  # The Docker socket is how the platform runs users' code. Access to it is
+  # equivalent to root on this server: that is why only these two processes
+  # have it, why they run as an unprivileged user granted only the socket's
+  # group, and why nothing a user controls ever gets it.
+  group_add:
+    - '${DOCKER_GID:-0}'
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  logging: &logging
+    driver: json-file
+    options: { max-size: '20m', max-file: '5' }
+  # Any other API setting (rate limits, per-account limits, sizes — see
+  # .env.example) can go in deploy/api.env. Optional; the defaults are
+  # production-safe. Settings below take precedence.
+  env_file:
+    - path: ./api.env
+      required: false
+  environment: &app-env
+    NODE_ENV: production
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Listen only on the edge network's gateway, where the proxy reaches it.
+    API_HOST: ${EDGE_GATEWAY:-172.31.250.1}
+    API_PORT: 4000
+    PREVIEW_PORT: 4100
+    DEPLOYMENT_PORT: 4200
+    TRUST_PROXY: 'true'
+    SESSION_COOKIE_SECURE: 'true'
+    API_PUBLIC_URL: https://${PLATFORM_DOMAIN}
+    WEB_PUBLIC_URL: https://${PLATFORM_DOMAIN}
+    CORS_ORIGINS: https://${PLATFORM_DOMAIN}
+    PREVIEW_HOST_SUFFIX: ${PREVIEW_DOMAIN}
+    PREVIEW_SCHEME: https
+    DEPLOYMENT_HOST_SUFFIX: ${APP_DOMAIN}
+    DEPLOYMENT_SCHEME: https
+    DATABASE_URL: postgresql://${POSTGRES_USER:-platform}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@172.31.251.10:5432/${POSTGRES_DB:-platform}
+    REDIS_URL: redis://172.31.251.12:6379
+    STORAGE_ENDPOINT: http://172.31.251.11:9000
+    STORAGE_BUCKET: ${STORAGE_BUCKET:-platform-assets}
+    STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?set STORAGE_ACCESS_KEY}
+    STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?set STORAGE_SECRET_KEY}
+    USER_DATABASE_ADMIN_URL: postgresql://${USERDB_USER:-userdb_admin}:${USERDB_PASSWORD:?set USERDB_PASSWORD}@172.31.252.10:5432/postgres
+    USER_DATABASE_CONTAINER_HOST: ${STACK:-platform}-userdb
+    SECRETS_ENCRYPTION_KEY: ${SECRETS_ENCRYPTION_KEY:?set SECRETS_ENCRYPTION_KEY}
+    SECRETS_PREVIOUS_KEYS: ${SECRETS_PREVIOUS_KEYS:-}
+    EXECUTION_PROVIDER: docker
+    DEPLOYMENT_PROVIDER: execution
+    DOCKER_SOCKET_PATH: /var/run/docker.sock
+    RUNTIME_NETWORK: ${STACK:-platform}-runtimes
+    RUNTIME_NETWORK_POOL: ${RUNTIME_NETWORK_POOL:-10.210.0.0/16}
+    # Never publish users' ports on the host: a published port is reachable
+    # from every other project's network. The api dials containers directly.
+    RUNTIME_PUBLISH_PORTS: never
+    # Sandboxing and disk limits (see production.env.example).
+    RUNTIME_OCI_RUNTIME: ${RUNTIME_OCI_RUNTIME:-}
+    DISK_LIMIT_MODE: ${DISK_LIMIT_MODE:-monitor}
+    RUNTIME_DISK_MB: ${RUNTIME_DISK_MB:-2048}
+    DEPLOYMENT_DISK_MB: ${DEPLOYMENT_DISK_MB:-2048}
+    SMTP_HOST: ${SMTP_HOST:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_SECURE: ${SMTP_SECURE:-false}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    MAIL_FROM: ${MAIL_FROM:-}
+    METRICS_TOKEN: ${METRICS_TOKEN:-}
+    ORPHAN_SWEEP_ENABLED: ${ORPHAN_SWEEP_ENABLED:-true}
+    GIT_REMOTE_ALLOW_HTTP: 'false'
+    GIT_REMOTE_ALLOW_PRIVATE: 'false'
+
+services:
+  proxy:
+    image: ${STACK:-platform}-proxy:${VERSION:-latest}
+    build:
+      context: ..
+      target: proxy
+    container_name: ${STACK:-platform}-proxy
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTPS_PORT:-443}:443/udp'
+    environment:
+      TLS_MODE: ${TLS_MODE:-acme}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:?set PLATFORM_DOMAIN}
+      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:?set PREVIEW_DOMAIN}
+      UPSTREAM_HOST: ${EDGE_GATEWAY:-172.31.250.1}
+    volumes:
+      # Certificates. Losing them means asking for all of them again, which
+      # certificate authorities rate-limit.
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+    networks:
+      edge:
+        ipv4_address: 172.31.250.10
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    container_name: ${STACK:-platform}-api
+    command: ['node', 'dist/index.js']
+    environment:
+      <<: *app-env
+      # The worker below does the background work.
+      JOB_WORKER_ENABLED: 'false'
+    depends_on: &ready
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      userdb:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    container_name: ${STACK:-platform}-worker
+    command: ['node', 'dist/worker.js']
+    healthcheck:
+      disable: true
+    depends_on: *ready
+
+  # Applies database migrations, then exits. The api image, with Prisma's CLI.
+  migrate:
+    image: ${STACK:-platform}-api:${VERSION:-latest}
+    build:
+      context: ..
+      target: api
+    restart: 'no'
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    healthcheck:
+      disable: true
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-platform}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-platform}
+    logging: *logging
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: ${STACK:-platform}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-platform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-platform}
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-platform} -d ${POSTGRES_DB:-platform}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *logging
+    networks:
+      platform:
+        ipv4_address: 172.31.251.10
+
+  # Projects' databases, on a server of its own: a project's SQL reaches
+  # nothing of the platform's because nothing of the platform's is here.
+  userdb:
+    image: postgres:17-alpine
+    container_name: ${STACK:-platform}-userdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USERDB_USER:-userdb_admin}
+      POSTGRES_PASSWORD: ${USERDB_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    volumes:
+      - userdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${USERDB_USER:-userdb_admin} -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *logging
+    networks:
+      runtimes:
+        ipv4_address: 172.31.252.10
+
+  minio:
+    # From MinIO's own registry: Docker Hub no longer serves MinIO images, so a
+    # fresh machine (or a CI runner) cannot pull them from there.
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: ${STACK:-platform}-minio
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *logging
+    networks:
+      platform:
+        ipv4_address: 172.31.251.11
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    restart: 'no'
+    environment:
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-platform-assets}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      MINIO_URL: http://minio:9000
+    entrypoint: ['/bin/sh', '/init/create-bucket.sh']
+    volumes:
+      - ../infra/minio/create-bucket.sh:/init/create-bucket.sh:ro
+    networks: [platform]
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${STACK:-platform}-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    logging: *logging
+    networks:
+      platform:
+        ipv4_address: 172.31.251.12
+
+  backup:
+    image: ${STACK:-platform}-backup:${VERSION:-latest}
+    build:
+      context: ..
+      target: backup
+    container_name: ${STACK:-platform}-backup
+    restart: unless-stopped
+    environment:
+      PLATFORM_DB_HOST: postgres
+      PLATFORM_DB_USER: ${POSTGRES_USER:-platform}
+      PLATFORM_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PLATFORM_DB_NAME: ${POSTGRES_DB:-platform}
+      USERDB_HOST: userdb
+      USERDB_USER: ${USERDB_USER:-userdb_admin}
+      USERDB_PASSWORD: ${USERDB_PASSWORD}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-platform-backups}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      AWS_DEFAULT_REGION: ${BACKUP_S3_REGION:-us-east-1}
+    volumes:
+      - ${BACKUP_HOST_DIR:-backups}:/backups
+      # Where it reports its last success, for monitoring.
+      - node_textfile:/metrics-textfile
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/backup-healthy.sh']
+      interval: 5m
+      timeout: 10s
+      start_period: 10m
+    logging: *logging
+    networks: [platform, runtimes]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      userdb:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Monitoring (optional): start with `--profile monitoring`.
+  #
+  # Prometheus collects the platform's /metrics and the server's own numbers,
+  # Alertmanager emails ALERT_EMAIL when a rule fires, and Grafana shows a
+  # ready-made dashboard. None of it is reachable from outside: the web pages
+  # listen on the server's loopback only — open them through an SSH tunnel.
+  # ---------------------------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: ${STACK:-platform}-node-exporter
+    profiles: [monitoring]
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=${EDGE_GATEWAY:-172.31.250.1}:9100
+      - --collector.textfile.directory=/textfile
+    volumes:
+      - /:/host:ro
+      - node_textfile:/textfile:ro
+    logging: *logging
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: ${STACK:-platform}-prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+    entrypoint: ['/bin/sh', '/etc/prometheus/entrypoint.sh']
+    environment:
+      EDGE_GATEWAY: ${EDGE_GATEWAY:-172.31.250.1}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      PROMETHEUS_RETENTION: ${PROMETHEUS_RETENTION:-30d}
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./monitoring/prometheus-entrypoint.sh:/etc/prometheus/entrypoint.sh:ro
+      - prometheus_data:/prometheus
+    ports:
+      - '127.0.0.1:${PROMETHEUS_PORT:-9090}:9090'
+    logging: *logging
+    networks: [edge, monitoring]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ${STACK:-platform}-alertmanager
+    profiles: [monitoring]
+    restart: unless-stopped
+    entrypoint: ['/bin/sh', '/etc/alertmanager/entrypoint.sh']
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      ALERT_EMAIL: ${ALERT_EMAIL:-}
+      ALERT_SMTP_REQUIRE_TLS: ${ALERT_SMTP_REQUIRE_TLS:-true}
+    volumes:
+      - ./monitoring/alertmanager-entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - '127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093'
+    logging: *logging
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: ${STACK:-platform}-grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
+    logging: *logging
+    networks: [monitoring]
+
+networks:
+  # The proxy's network. Its gateway is where the api listens.
+  edge:
+    name: ${STACK:-platform}-edge
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+          gateway: ${EDGE_GATEWAY:-172.31.250.1}
+  platform:
+    name: ${STACK:-platform}-internal
+    ipam:
+      config:
+        - subnet: 172.31.251.0/24
+  # The project database server's own network; the platform connects it to each
+  # project's network as that project needs it.
+  monitoring:
+    name: ${STACK:-platform}-monitoring
+  runtimes:
+    name: ${STACK:-platform}-runtimes
+    ipam:
+      config:
+        - subnet: 172.31.252.0/24
+
+volumes:
+  postgres_data:
+  userdb_data:
+  minio_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+  backups:
+  node_textfile:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

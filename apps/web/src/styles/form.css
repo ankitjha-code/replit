@@ -1,0 +1,111 @@
+.auth-card {
+  max-width: 400px;
+  margin: 0 auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-8);
+}
+
+.auth-card h1 {
+  margin: 0 0 var(--space-1);
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  margin: 0 0 var(--space-6);
+  color: var(--text-secondary);
+}
+
+.auth-note {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.field {
+  margin-bottom: var(--space-4);
+}
+
+.field label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(242 98 7 / 20%);
+}
+
+.input--error {
+  border-color: var(--status-down);
+}
+
+.field-hint,
+.field-error {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+}
+
+.field-hint {
+  color: var(--text-muted);
+}
+
+.field-error {
+  color: var(--status-down);
+}
+
+.form-error {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: rgb(248 81 73 / 10%);
+  border: 1px solid var(--status-down);
+  border-radius: var(--radius-sm);
+  color: var(--status-down);
+  font-size: 13px;
+}
+
+.button-primary {
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-switch {
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}

@@ -1,0 +1,148 @@
+# Reverse proxy for the platform.
+#
+# Three kinds of traffic arrive here, separated by Host header:
+#
+#   localhost:8080              the platform itself (web client + control plane)
+#   *.preview.localhost:8080    a project's development preview   (Task 20)
+#   *.app.localhost:8080        a running deployment              (Task 39)
+#
+# Previews are deliberately NOT served through this proxy. Task 20 gave them a
+# listener of their own on PREVIEW_PORT, so a project's pages are answered by a
+# separate process on a separate port and can never be reached on the platform's
+# own origin. That host is still matched here so a request arriving on the wrong
+# port is refused rather than being handed the workspace.
+#
+# Deployments ARE routed, to their own listener on DEPLOY_UPSTREAM. Same
+# reasoning as a preview and one difference: a deployment is public, so it has
+# no cookie to protect and nothing about the request is trusted. See the block
+# below, and section 6z of the architecture reference.
+
+{
+	# Everything is plain HTTP on an explicit port locally. Certificates are
+	# the production proxy's job, not the development one's.
+	auto_https off
+
+	# No admin API. Nothing needs it, and leaving it off removes a way to
+	# reconfigure the proxy from inside the network.
+	admin off
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+:8080 {
+	# ---------------------------------------------------------------------
+	# Proxy's own liveness. Answered by Caddy itself so it stays truthful
+	# when every upstream is down.
+	# ---------------------------------------------------------------------
+	@proxy_health path /__proxy/health
+	handle @proxy_health {
+		header Content-Type application/json
+		respond `{"status":"ok","service":"proxy"}` 200
+	}
+
+	# ---------------------------------------------------------------------
+	# Development previews. Served by the control plane's own preview listener
+	# on PREVIEW_PORT, not from here. Matched so that a preview hostname aimed
+	# at this port is refused instead of falling through to the workspace.
+	# ---------------------------------------------------------------------
+	@preview host *.{$PREVIEW_DOMAIN:preview.localhost}
+	handle @preview {
+		header Content-Type application/json
+		respond `{"error":{"code":"RUNTIME_UNAVAILABLE","message":"Previews are not served on this port. Open the preview from the workspace, which addresses the preview listener directly."}}` 503
+	}
+
+	# ---------------------------------------------------------------------
+	# Deployments, on the platform's own domain.
+	#
+	# Forwarded to the deployment listener, which resolves the hostname to a
+	# project and answers with stored static files or a proxy to a running
+	# container. The Host header is passed through unchanged because it is
+	# the whole address: the listener has nothing else to route on.
+	#
+	# Nothing about these requests is trusted. The listener authenticates
+	# nobody, shares no cookie with the platform, and never treats a request
+	# arriving here as coming from a signed-in person.
+	# ---------------------------------------------------------------------
+	@deployment host *.{$DEPLOY_DOMAIN:app.localhost}
+	handle @deployment {
+		reverse_proxy {$DEPLOY_UPSTREAM:host.docker.internal:4200} {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ---------------------------------------------------------------------
+	# Control plane. These prefixes are the API's; everything else is the
+	# client's. Keeping both on one origin means session cookies and
+	# WebSocket upgrades behave identically here and in the Vite dev server.
+	# ---------------------------------------------------------------------
+	@api path /api/* /health/* /ws/*
+	handle @api {
+		# Caddy forwards the original Host and sets X-Forwarded-For/Proto
+		# by default, which is what the API's TRUST_PROXY handling reads.
+		reverse_proxy {$API_UPSTREAM:host.docker.internal:4000} {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ---------------------------------------------------------------------
+	# Web client. In development this is the Vite dev server, which needs
+	# its own WebSocket for hot reload; reverse_proxy upgrades it as-is.
+	# ---------------------------------------------------------------------
+	handle {
+		reverse_proxy {$WEB_UPSTREAM:host.docker.internal:5173}
+	}
+
+	# An upstream that is simply not running is the normal case during
+	# development. Say so, rather than emitting Caddy's default page.
+	handle_errors {
+		header Content-Type application/json
+		respond `{"error":{"code":"SERVICE_UNAVAILABLE","message":"Upstream is not reachable. Is the dev server running?"}}` 502
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Custom domains.
+#
+# Somebody else's hostname, pointed here by its owner. Handled in its own site
+# block because it matches by exclusion: anything that is not the platform's own
+# domain and not a preview host is either a verified custom domain or nothing.
+#
+# Commented out for local development, where `auto_https off` is set above and
+# there is no certificate to obtain. Uncomment it, remove `auto_https off`, and
+# set DEPLOY_DOMAIN to a real domain to serve custom domains in production.
+#
+# The two directives that matter:
+#
+#   on_demand_tls { ask ... }
+#       Caddy asks the control plane, during the TLS handshake, whether it
+#       should obtain a certificate for the hostname being requested. Without
+#       it, one request could make this installation ask a certificate authority
+#       about a name nobody here has ever heard of, which is how an installation
+#       gets rate-limited or worse. The endpoint answers 200 or 404 and nothing
+#       else, and must be reachable only from this proxy.
+#
+#   tls { on_demand }
+#       Issue per hostname, at handshake time, rather than from a list known in
+#       advance. A platform serving customer domains cannot have that list: it
+#       changes whenever somebody adds one.
+#
+# {
+#	on_demand_tls {
+#		ask {$API_UPSTREAM:host.docker.internal:4000}/internal/tls-authorize
+#		interval 2m
+#		burst 5
+#	}
+# }
+#
+# https:// {
+#	tls {
+#		on_demand
+#	}
+#
+#	reverse_proxy {$DEPLOY_UPSTREAM:host.docker.internal:4200} {
+#		header_up X-Real-IP {remote_host}
+#	}
+# }

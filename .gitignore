@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# env / secrets  (NEVER commit these)
+.env
+.env.*
+!.env.example
+
+# test artifacts
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# local runtime data (bind mounts, project workspaces)
+.data/
+.volumes/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+# Prisma client, generated from the schema
+apps/api/src/generated/
+
+# production settings (secrets)
+deploy/production.env
+deploy/*.local.env
+
+# Extra API settings for production (optional, secrets allowed)
+deploy/api.env

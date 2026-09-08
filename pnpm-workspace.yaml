@@ -1,0 +1,26 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'e2e'
+
+# Install scripts are opt-in. Only packages that genuinely need to fetch a
+# platform-specific binary are allowed to run one; everything else is denied,
+# so a compromised transitive dependency cannot execute code at install time.
+allowBuilds:
+  esbuild: true # platform-specific bundler binary
+  prisma: true # query engine binary
+  '@prisma/engines': true # query engine binary
+  msgpackr-extract: false # optional native speedup, not needed
+  workerd: false # Cloudflare runtime, not used here
+  # Pulled in by dockerode's SSH transport, which this platform does not use:
+  # the Docker daemon is reached over a local socket. ssh2 works without its
+  # optional native speedup, and protobufjs's postinstall only generates types.
+  cpu-features: false # optional native speedup for ssh2, unused
+  protobufjs: false # type generation, not needed at runtime
+  ssh2: false # SSH transport, unused; pure JS is enough
+
+# Security fixes forced into dependencies of dependencies (see docs/SECURITY-REVIEW.md).
+overrides:
+  dompurify: ^3.4.15
+  mysql2: ^3.24.4
+  deepmerge-ts: ^8.0.2

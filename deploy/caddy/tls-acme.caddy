@@ -1,0 +1,2 @@
+# Real certificates from Let's Encrypt. The address is where expiry warnings go.
+email {$ACME_EMAIL}

@@ -1,0 +1,4 @@
+# Caddy's own local certificate authority: HTTPS without a public domain, for
+# testing this production setup on one machine. Browsers will not trust it
+# unless its root certificate is installed.
+local_certs

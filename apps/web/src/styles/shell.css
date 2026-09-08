@@ -1,0 +1,164 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  height: 44px;
+  flex: 0 0 auto;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.shell__brand {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.shell__brand-mark {
+  color: var(--accent);
+}
+
+.shell__nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.shell__nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.shell__nav a[aria-current='page'] {
+  color: var(--text-primary);
+  background: var(--bg-overlay);
+}
+
+.shell__main {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: var(--space-8);
+}
+
+/*
+ * For surfaces that manage their own space edge to edge. The workspace sizes
+ * its panels against the viewport, so page padding and page scrolling would
+ * both work against it.
+ */
+.shell__main--flush {
+  padding: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.panel {
+  max-width: 720px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+}
+
+.panel h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 20px;
+}
+
+.panel p {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-muted);
+}
+
+.status-dot--ok {
+  background: var(--status-ok);
+}
+.status-dot--degraded {
+  background: var(--status-warn);
+}
+.status-dot--down {
+  background: var(--status-down);
+}
+
+.status-row__detail {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.empty-note {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.user-menu__name {
+  color: var(--text-secondary);
+  font-size: 13px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.button-quiet {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-quiet:hover:not(:disabled) {
+  background: var(--bg-overlay);
+}
+
+.button-quiet:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button-quiet--accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.button-quiet--accent:hover {
+  background: var(--accent-hover);
+}
