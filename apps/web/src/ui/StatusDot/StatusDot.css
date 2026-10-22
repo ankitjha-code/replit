@@ -1,0 +1,47 @@
+@layer ui {
+  .ui-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--text-muted);
+    vertical-align: middle;
+    flex: none;
+  }
+
+  .ui-status-dot--ok {
+    background: var(--ok);
+  }
+  .ui-status-dot--warn {
+    background: var(--warn);
+  }
+  .ui-status-dot--danger {
+    background: var(--danger);
+  }
+  .ui-status-dot--info {
+    background: var(--info);
+  }
+  .ui-status-dot--accent {
+    background: var(--accent);
+  }
+
+  .ui-status-dot--pulse {
+    animation: ui-status-pulse 1200ms var(--ease-standard) infinite;
+  }
+
+  @keyframes ui-status-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-status-dot--pulse {
+      animation: none;
+    }
+  }
+}

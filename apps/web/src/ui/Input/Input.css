@@ -1,0 +1,131 @@
+@layer ui {
+  .ui-input-wrap {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    height: var(--control-h-lg);
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-2);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    transition: border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .ui-input-wrap--sm {
+    height: var(--control-h-sm);
+    border-radius: var(--radius-1);
+    font-size: var(--text-xs);
+  }
+
+  .ui-input-wrap--md {
+    height: var(--control-h-md);
+    border-radius: var(--radius-1);
+    font-size: var(--text-sm);
+  }
+
+  .ui-input-wrap--mono {
+    font-family: var(--font-mono);
+    font-size: var(--mono-sm);
+  }
+
+  .ui-input-wrap--invalid {
+    border-color: var(--danger);
+  }
+
+  .ui-input-wrap--disabled {
+    border-style: dashed;
+    color: var(--text-disabled);
+  }
+
+  .ui-input-wrap--readonly {
+    background: var(--bg-canvas);
+  }
+
+  /*
+   * The ring belongs to the whole field, so a leading icon or a trailing
+   * button sits inside it. The inner input's own ring from base.css is
+   * switched off below; two rings would leave the icon outside the inner one.
+   * Read-only fields keep the ring too: they are still a tab stop.
+   */
+  .ui-input-wrap:focus-within {
+    border-color: var(--border-strong);
+    box-shadow:
+      0 0 0 2px var(--bg-base),
+      0 0 0 4px var(--focus);
+  }
+
+  .ui-input:focus-visible {
+    box-shadow: none;
+  }
+
+  .ui-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 var(--space-3);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+  }
+
+  .ui-input-wrap--sm .ui-input,
+  .ui-input-wrap--md .ui-input {
+    padding: 0 var(--space-2);
+  }
+
+  .ui-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .ui-input:disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .ui-input__leading,
+  .ui-input__trailing {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    color: var(--text-muted);
+  }
+
+  .ui-input__leading {
+    padding-left: var(--space-2);
+  }
+
+  .ui-input__leading + .ui-input {
+    padding-left: var(--space-2);
+  }
+
+  .ui-input__trailing {
+    padding-right: var(--space-1);
+  }
+
+  .ui-input__trailing:has(> .ui-input__text) {
+    padding-right: var(--space-2);
+  }
+
+  @media (max-width: 767px) {
+    .ui-input-wrap {
+      height: var(--control-h-touch);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .ui-input-wrap:focus-within {
+      outline: 2px solid CanvasText;
+      outline-offset: 2px;
+    }
+
+    .ui-input:focus-visible {
+      outline: none;
+    }
+  }
+}

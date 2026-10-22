@@ -1,0 +1,436 @@
+/*
+ * The editor panel: tab strip, messages, the Monaco surface, the status bar,
+ * and the dialogs that belong to it. Feature layer, tokens only (design spec
+ * 5.1, 9.5). The classes Monaco and y-monaco paint (.monaco-editor,
+ * .yRemoteSelection*) keep their names because the browser tests read them.
+ */
+@layer feature {
+  .editor-pane {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--bg-canvas);
+    --focus-gap: var(--bg-canvas);
+  }
+
+  .editor-pane--empty {
+    justify-content: center;
+    background: var(--bg-base);
+  }
+
+  /* --- tabs ---------------------------------------------------------------- */
+
+  .editor-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    min-width: 0;
+    height: 32px;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .editor-tabs__list {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Fades at both edges say there is more to scroll to. */
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      var(--bg-base) 12px,
+      var(--bg-base) calc(100% - 12px),
+      transparent
+    );
+  }
+
+  .editor-tabs__list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .editor-tabs__overflow {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0 var(--space-1);
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .editor-tab {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    max-width: 220px;
+    border-right: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+  }
+
+  .editor-tab:hover {
+    color: var(--text-secondary);
+    background-image: linear-gradient(var(--bg-hover), var(--bg-hover));
+  }
+
+  .editor-tab--active {
+    color: var(--text-primary);
+    background: var(--bg-canvas);
+    /* A top edge rather than a bottom one, so the active tab reads as joined to
+       the editor below it, and the hairline under the strip is interrupted. */
+    box-shadow:
+      inset 0 2px 0 var(--accent),
+      0 1px 0 var(--bg-canvas);
+  }
+
+  .editor-tab--active:hover {
+    background-image: none;
+  }
+
+  .editor-tab__button {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 32px;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .editor-tab__button:focus-visible {
+    /* Inset, so the ring is not clipped by the strip's overflow. */
+    box-shadow:
+      inset 0 0 0 2px var(--focus),
+      inset 0 0 0 4px var(--bg-canvas);
+  }
+
+  .editor-tab__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Its file is gone; the text is still here until the person decides. */
+  .editor-tab--deleted .editor-tab__name {
+    text-decoration: line-through;
+  }
+
+  .editor-tab__close {
+    margin-right: var(--space-1);
+    color: inherit;
+  }
+
+  .editor-tab:not(:hover):not(:focus-within) .editor-tab__close:not(:focus-visible) {
+    /* Only the active tab shows its cross at rest; the others on hover. */
+    opacity: 0;
+  }
+
+  .editor-tab--active .editor-tab__close,
+  .editor-tab--unsaved .editor-tab__close {
+    opacity: 1 !important;
+  }
+
+  .editor-tab__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+  }
+
+  .editor-tab__dot {
+    color: var(--accent);
+  }
+
+  .editor-tab__x {
+    display: none;
+  }
+
+  .editor-tab:hover .editor-tab__dot,
+  .editor-tab__close:focus-visible .editor-tab__dot {
+    display: none;
+  }
+
+  .editor-tab:hover .editor-tab__x,
+  .editor-tab__close:focus-visible .editor-tab__x {
+    display: inline;
+  }
+
+  /* --- body ---------------------------------------------------------------- */
+
+  .editor-tabpanel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .editor-messages {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+  }
+
+  .editor-messages:empty {
+    display: none;
+  }
+
+  /* Messages sit flush between the tabs and the code, so they lose their card edges. */
+  .editor-messages .ui-callout {
+    padding: var(--space-2) var(--space-3);
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+
+  .editor-conflict-bar .ui-callout__action,
+  .editor-deleted-bar .ui-callout__action {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .editor-surface {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .editor-monaco {
+    height: 100%;
+    width: 100%;
+  }
+
+  /* Monaco's focus ring, drawn inset on the canvas with the one focus hue. */
+  .editor-monaco .monaco-editor.focused {
+    box-shadow: inset 0 0 0 1px var(--focus);
+  }
+
+  .editor-skeleton {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3) 56px;
+    overflow: hidden;
+  }
+
+  .editor-skeleton .editor-skeleton__line {
+    margin: 0;
+    width: 55%;
+  }
+
+  .editor-skeleton .editor-skeleton__line:nth-child(3n) {
+    width: 72%;
+  }
+
+  .editor-skeleton .editor-skeleton__line:nth-child(4n + 1) {
+    width: 38%;
+    margin-left: var(--space-4);
+  }
+
+  .editor-skeleton .editor-skeleton__line:nth-child(5n + 2) {
+    width: 24%;
+  }
+
+  .editor-unopenable {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    min-height: 0;
+    padding: var(--space-4);
+    overflow: auto;
+    background: var(--bg-base);
+  }
+
+  .editor-unopenable__image {
+    max-width: 100%;
+    max-height: 50%;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2);
+    background: var(--bg-canvas);
+  }
+
+  /* --- status bar ---------------------------------------------------------- */
+
+  .editor-statusbar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-2);
+    height: 24px;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    background: var(--bg-raised);
+    --focus-gap: var(--bg-raised);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+  }
+
+  .editor-statusbar__path {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--mono-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .editor-statusbar__copy {
+    flex: 0 0 auto;
+  }
+
+  .editor-statusbar__spacer {
+    flex: 1 1 auto;
+  }
+
+  .editor-statusbar__item {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .editor-statusbar__state {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-1);
+    white-space: nowrap;
+  }
+
+  .editor-statusbar__state--ok {
+    color: var(--ok);
+  }
+
+  .editor-statusbar__state--pending {
+    color: var(--text-primary);
+  }
+
+  .editor-statusbar__state--pending .editor-statusbar__state-icon {
+    color: var(--accent);
+  }
+
+  .editor-statusbar__state--warn {
+    color: var(--warn);
+  }
+
+  .editor-statusbar__state--danger {
+    color: var(--danger);
+  }
+
+  .editor-statusbar__state--muted {
+    color: var(--text-muted);
+  }
+
+  .editor-statusbar__state--busy .editor-statusbar__state-icon {
+    animation: editor-spin 900ms linear infinite;
+  }
+
+  @keyframes editor-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .editor-statusbar .ui-button--sm {
+    height: 20px;
+  }
+
+  /* --- remote carets ------------------------------------------------------- */
+
+  /* y-monaco paints these; the colour per participant is injected by CodeEditor. */
+  .editor-monaco .yRemoteSelectionHead {
+    position: absolute;
+    box-sizing: border-box;
+    height: 100%;
+  }
+
+  /* The name flag: content and background come from the injected rule. */
+  .editor-monaco .yRemoteSelectionHead::after {
+    position: absolute;
+    top: -16px;
+    left: -2px;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-1) var(--radius-1) var(--radius-1) 0;
+    color: var(--on-presence);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: var(--weight-medium);
+    line-height: 16px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* --- dialogs ------------------------------------------------------------- */
+
+  .editor-compare__labels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  .editor-compare__surface,
+  .editor-compare__loading {
+    height: min(60vh, 520px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2);
+    overflow: hidden;
+  }
+
+  .editor-compare__loading .ui-skeleton {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .editor-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  /* --- phone --------------------------------------------------------------- */
+
+  @media (max-width: 479px) {
+    .editor-statusbar__item--wide {
+      display: none;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .editor-tabs,
+    .editor-tab__button {
+      height: var(--control-h-touch);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .editor-statusbar__state--busy .editor-statusbar__state-icon {
+      animation: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .editor-tab {
+      border: 1px solid ButtonText;
+    }
+
+    .editor-tab--active {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}

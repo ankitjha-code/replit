@@ -1,0 +1,997 @@
+/*
+ * The workspace frame (design spec 9.1, 9.2, 9.9, 9.10, 9.11): toolbar, run
+ * strip, guide strip, panel grid, splitters, rails, presence, the phone
+ * switcher and the shell popovers. Feature layer, tokens only. The panels'
+ * own insides (files, editor, console, preview) belong to their packages.
+ */
+@layer feature {
+  .workspace {
+    --splitter-size: 6px;
+    --rail-size: 28px;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--bg-base);
+  }
+
+  .workspace--message {
+    align-items: center;
+    justify-content: center;
+    padding: var(--gutter);
+  }
+
+  .workspace--message .ui-callout {
+    max-width: var(--width-prose);
+  }
+
+  /* --- toolbar ------------------------------------------------------------- */
+
+  .ws-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border-subtle);
+    --focus-gap: var(--bg-raised);
+  }
+
+  .ws-toolbar__crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .ws-toolbar__brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-md);
+    height: var(--control-h-md);
+    border-radius: var(--radius-2);
+    color: var(--accent);
+    flex: 0 0 auto;
+  }
+
+  .ws-toolbar__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-touch);
+    height: var(--control-h-touch);
+    flex: 0 0 auto;
+    border-radius: var(--radius-2);
+    color: var(--text-secondary);
+  }
+
+  .ws-toolbar__back:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .ws-toolbar__crumb {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    text-decoration: none;
+    border-radius: var(--radius-1);
+    white-space: nowrap;
+  }
+
+  .ws-toolbar__crumb:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+  }
+
+  .ws-toolbar__separator {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .ws-toolbar__title {
+    margin: 0;
+    min-width: 0;
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  /* Focused only as the Tab starting point on arrival; it is not a control. */
+  .ws-toolbar__title:focus-visible {
+    box-shadow: none;
+  }
+
+  .ws-toolbar__title--plain {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-toolbar__project {
+    max-width: 320px;
+    padding-left: var(--space-2);
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .ws-toolbar__project > :first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-toolbar__slug {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--mono-xs);
+    line-height: var(--leading-mono-xs);
+    white-space: nowrap;
+  }
+
+  .ws-toolbar__people {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 0 0 auto;
+  }
+
+  .ws-toolbar__spacer {
+    flex: 1 1 auto;
+  }
+
+  .ws-toolbar__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .ws-toolbar__account .account-menu__name {
+    max-width: 120px;
+  }
+
+  .ws-toolbar--skeleton {
+    gap: var(--space-4);
+  }
+
+  @media (max-width: 1099px) {
+    .ws-toolbar__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .ws-toolbar__slug,
+    .env-control__detail {
+      display: none;
+    }
+  }
+
+  /* --- the Environment half of the run strip -------------------------------- */
+
+  .env-control {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .env-control__label {
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  .runtime-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--control-h-sm);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    white-space: nowrap;
+  }
+
+  .runtime-chip--running {
+    color: var(--text-primary);
+  }
+
+  .runtime-chip--failed {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  .env-control__uptime {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .env-control__detail {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    max-width: 28ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-control__action--stop:hover:not(:disabled) {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  /* The full-width line under the toolbar: progress, failures, the provider's reason. */
+  .env-notices {
+    display: grid;
+    gap: var(--space-2);
+    flex: 1 0 100%;
+    padding-bottom: var(--space-2);
+  }
+
+  .env-notices__starting {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .env-notices__step {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  /* --- guide strip (design spec 8.3) --------------------------------------- */
+
+  .guide-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 0 var(--space-3);
+    background: var(--bg-selected);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .guide-strip__icon {
+    color: var(--accent);
+    flex: 0 0 auto;
+  }
+
+  .guide-strip__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .guide-strip .ui-button--link {
+    height: auto;
+  }
+
+  /* "Show me" and focusStart(): three pulses of the focus ring, then nothing. */
+  .ui-guide-flash {
+    animation: ws-guide-flash 1200ms var(--ease-standard) 3;
+  }
+
+  @keyframes ws-guide-flash {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 2px var(--bg-raised),
+        0 0 0 4px transparent;
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px var(--bg-raised),
+        0 0 0 4px var(--focus);
+    }
+  }
+
+  /* --- panel grid ---------------------------------------------------------- */
+
+  .workspace-body {
+    display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+
+  .workspace-body--phone {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-body--phone > .panel-frame {
+    flex: 1 1 auto;
+    border: 0;
+  }
+
+  .workspace-body--loading {
+    grid-template-columns: 16% minmax(0, 1fr) 22%;
+    gap: 1px;
+    padding: 1px;
+  }
+
+  .workspace-body--loading > .ui-skeleton {
+    height: 100%;
+  }
+
+  .workspace-center {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .panel-frame {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg-base);
+    border: 0;
+    border-left: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+
+  .panel-frame:first-child,
+  .workspace-center > .panel-frame {
+    border-left: 0;
+  }
+
+  .panel-frame[hidden] {
+    display: none;
+  }
+
+  .panel-frame__bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 0 0 auto;
+    height: var(--rail-size);
+    padding: 0 var(--space-1) 0 var(--space-3);
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border-subtle);
+    --focus-gap: var(--bg-raised);
+  }
+
+  .panel-frame__title {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .panel-frame__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+    min-width: 0;
+  }
+
+  .panel-frame__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+  }
+
+  /* --- splitters and rails ------------------------------------------------- */
+
+  .splitter {
+    display: block;
+    position: relative;
+    z-index: var(--z-rail);
+    background: transparent;
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  /* The hairline is drawn in the middle of the track; the track itself is the hit area. */
+  .splitter::after {
+    content: '';
+    position: absolute;
+    background: var(--border-subtle);
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .splitter--vertical {
+    cursor: col-resize;
+  }
+
+  .splitter--vertical::after {
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 0.5px);
+    width: 1px;
+  }
+
+  .splitter--horizontal {
+    cursor: row-resize;
+  }
+
+  .splitter--horizontal::after {
+    left: 0;
+    right: 0;
+    top: calc(50% - 0.5px);
+    height: 1px;
+  }
+
+  .splitter::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+  }
+
+  .splitter:hover::after,
+  .splitter:focus-visible::after,
+  .splitter:active::after {
+    background: var(--accent);
+  }
+
+  .splitter--vertical:hover::after,
+  .splitter--vertical:focus-visible::after,
+  .splitter--vertical:active::after {
+    width: 2px;
+    left: calc(50% - 1px);
+  }
+
+  .splitter--horizontal:hover::after,
+  .splitter--horizontal:focus-visible::after,
+  .splitter--horizontal:active::after {
+    height: 2px;
+    top: calc(50% - 1px);
+  }
+
+  .splitter:focus-visible {
+    box-shadow: none;
+    outline: none;
+  }
+
+  @media (pointer: coarse) {
+    .splitter::before {
+      inset: -6px;
+    }
+  }
+
+  .collapsed-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    width: var(--rail-size);
+    min-height: 0;
+    padding: var(--space-1) 0;
+    background: var(--bg-raised);
+    border-right: 1px solid var(--border-subtle);
+    border-left: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    --focus-gap: var(--bg-raised);
+  }
+
+  .collapsed-rail__label {
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    /* Reads bottom to top so the narrow rail still holds its name. */
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    order: 1;
+  }
+
+  .collapsed-rail--horizontal {
+    flex-direction: row;
+    width: auto;
+    height: var(--rail-size);
+    padding: 0 var(--space-1) 0 var(--space-3);
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .collapsed-rail--horizontal .collapsed-rail__label {
+    writing-mode: horizontal-tb;
+    transform: none;
+    order: 0;
+    margin-right: auto;
+  }
+
+  /* --- presence and connection (design spec 9.11) --------------------------- */
+
+  .presence {
+    display: flex;
+    align-items: center;
+  }
+
+  .presence__member {
+    display: inline-flex;
+    border-radius: var(--radius-full);
+    margin-left: calc(var(--space-1) * -1);
+  }
+
+  .presence__member:first-child {
+    margin-left: 0;
+  }
+
+  .presence__more {
+    margin-left: var(--space-1);
+    padding: 0 var(--space-2);
+  }
+
+  .presence__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .presence__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .presence__row-name {
+    color: var(--text-primary);
+  }
+
+  .presence__row-file {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--mono-xs);
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 20ch;
+  }
+
+  .connection {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    border-radius: var(--radius-1);
+    color: var(--text-muted);
+  }
+
+  .connection--connected {
+    color: var(--ok);
+  }
+
+  .connection--reconnecting {
+    color: var(--warn);
+  }
+
+  .connection--reconnecting .connection__icon {
+    animation: ws-spin 900ms linear infinite;
+  }
+
+  .connection--offline {
+    color: var(--text-muted);
+  }
+
+  @keyframes ws-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* --- phone switcher (design spec 9.10) ------------------------------------ */
+
+  .phone-switcher {
+    display: flex;
+    flex: 0 0 auto;
+    position: relative;
+    z-index: var(--z-rail);
+    min-height: 48px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--bg-raised);
+    border-top: 1px solid var(--border-subtle);
+    --focus-gap: var(--bg-raised);
+  }
+
+  .phone-switcher__tab {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: var(--space-1) 0;
+    background: none;
+    border: 0;
+    border-top: 2px solid transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .phone-switcher__tab--active {
+    color: var(--text-primary);
+    border-top-color: var(--accent);
+  }
+
+  .phone-switcher__icon {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .phone-switcher__dot {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    border: 2px solid var(--bg-raised);
+    background: var(--accent);
+  }
+
+  .phone-switcher__dot--console {
+    background: var(--ok);
+  }
+
+  /* --- share popover (design spec 6.4) -------------------------------------- */
+
+  .share-popover {
+    width: min(360px, calc(100vw - 2 * var(--gutter)));
+  }
+
+  .share {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .share__section + .share__section {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* Focused only when Share opens straight to it; the heading says where. */
+  .share__section:focus {
+    outline: none;
+  }
+
+  .share__section:focus-visible {
+    border-radius: var(--radius-1);
+    box-shadow:
+      0 0 0 2px var(--bg-overlay),
+      0 0 0 4px var(--focus);
+  }
+
+  .share__heading {
+    margin: 0 0 var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  .share__form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+
+  .share__field {
+    display: grid;
+    gap: var(--space-1);
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .share__field--narrow {
+    flex: 0 1 120px;
+  }
+
+  .share__label {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .share__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .share__error {
+    flex: 1 0 100%;
+    margin: 0;
+    color: var(--danger);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .share__members {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .share__member {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: var(--control-h-sm);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .share__member-role {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .share__links {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .share__minted {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .share__minted > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* --- language picker (design spec 9.3) ------------------------------------ */
+
+  .language-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .language-picker__tile {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    padding: var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-3);
+    background: var(--bg-raised);
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .language-picker__tile:hover {
+    background: var(--bg-hover);
+  }
+
+  .language-picker__tile:has(.language-picker__radio:checked) {
+    border-color: var(--accent);
+    background: var(--bg-selected);
+  }
+
+  .language-picker__tile:has(.language-picker__radio:focus-visible) {
+    box-shadow:
+      0 0 0 2px var(--bg-overlay),
+      0 0 0 4px var(--focus);
+  }
+
+  /* The radio is the control; the tile is its label. Hidden visually, still keyboard-reachable. */
+  .language-picker__radio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .language-picker__name {
+    color: var(--text-primary);
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-medium);
+  }
+
+  .language-picker__version {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  /* --- environment details popover (design spec 8.5) ------------------------ */
+
+  .env-popover {
+    width: min(380px, calc(100vw - 2 * var(--gutter)));
+  }
+
+  .env-popover__message {
+    margin: var(--space-3) 0 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .env-popover__change {
+    margin-top: var(--space-3);
+  }
+
+  .env-popover__history {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .env-popover__heading {
+    margin: 0 0 var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  .env-popover__events {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .env-popover__event {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .env-popover__event-word {
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
+    min-width: 6ch;
+  }
+
+  .env-popover__event-reason {
+    color: var(--text-secondary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-popover__event-time {
+    margin-left: auto;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .env-popover__empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  /* --- phone (design spec 9.10) --------------------------------------------- */
+
+  @media (max-width: 767px) {
+    .ws-toolbar {
+      gap: var(--space-2);
+      padding: 0 var(--space-2);
+    }
+
+    .ws-toolbar--phone .ws-toolbar__title--plain {
+      flex: 1 1 40px;
+      font-size: var(--text-sm);
+    }
+
+    .ws-toolbar--phone .ws-toolbar__actions {
+      margin-left: 0;
+      gap: 0;
+    }
+
+    .ws-toolbar--phone .account-menu__name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .ws-toolbar--phone .account-menu__trigger {
+      padding: 0 var(--space-1);
+    }
+
+    .env-control--compact {
+      flex: 0 0 auto;
+    }
+
+    .env-control--compact .env-control__uptime,
+    .env-control--compact .env-control__details {
+      display: none;
+    }
+
+    .env-control__action {
+      min-height: var(--control-h-touch);
+    }
+
+    .env-notices {
+      padding: 0 0 var(--space-2);
+    }
+
+    .guide-strip {
+      min-height: var(--control-h-touch);
+      padding: var(--space-1) var(--space-3);
+    }
+
+    .guide-strip__text {
+      white-space: normal;
+    }
+  }
+}

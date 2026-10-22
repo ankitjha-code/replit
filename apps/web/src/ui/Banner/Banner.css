@@ -1,0 +1,53 @@
+@layer ui {
+  .ui-banner {
+    position: relative;
+    z-index: var(--z-banner);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--control-h-lg);
+    padding: var(--space-1) var(--gutter);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--text-primary);
+  }
+
+  .ui-banner--info {
+    background: var(--info-bg);
+  }
+  .ui-banner--info .ui-banner__icon {
+    color: var(--info);
+  }
+
+  .ui-banner--warn,
+  .ui-banner--offline {
+    background: var(--warn-bg);
+  }
+  .ui-banner--warn .ui-banner__icon,
+  .ui-banner--offline .ui-banner__icon {
+    color: var(--warn);
+  }
+
+  .ui-banner--danger {
+    background: var(--danger-bg);
+  }
+  .ui-banner--danger .ui-banner__icon {
+    color: var(--danger);
+  }
+
+  .ui-banner__icon {
+    display: inline-flex;
+    flex: none;
+  }
+
+  .ui-banner__message {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ui-banner__action {
+    flex: none;
+  }
+}

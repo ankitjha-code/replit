@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src/**/*"],
+  // The generated Prisma client is JavaScript with its own declarations; it
+  // is resolved through those types but never compiled, and is copied into
+  // dist by the build script.
+  "exclude": ["node_modules", "dist", "src/generated"]
+}

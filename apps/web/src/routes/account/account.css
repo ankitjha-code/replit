@@ -1,0 +1,264 @@
+@layer feature {
+  .account-page {
+    max-width: var(--width-page);
+    margin: 0 auto;
+  }
+
+  .account-page__body {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: start;
+  }
+
+  .account-page__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    min-width: 0;
+    max-width: 720px;
+  }
+
+  .account-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  /* --- sidebar ------------------------------------------------------------ */
+
+  .account-nav {
+    position: sticky;
+    top: var(--space-4);
+  }
+
+  .account-nav__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .account-nav__link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-h-lg);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-2);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    text-decoration: none;
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  .account-nav__link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .account-nav__link[aria-current='page'] {
+    background: var(--bg-selected);
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  /* --- forms and facts ---------------------------------------------------- */
+
+  .account-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: var(--width-prose);
+  }
+
+  .account-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .account-email {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .account-email__address {
+    overflow-wrap: anywhere;
+  }
+
+  /* --- two-factor card ---------------------------------------------------- */
+
+  .account-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .account-card__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .account-card__title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  .account-card__text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .account-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .two-factor-setup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .two-factor-setup__scan {
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+  }
+
+  .two-factor-setup__qr {
+    flex: none;
+    width: 160px;
+    height: 160px;
+    padding: var(--space-2);
+    border-radius: var(--radius-2);
+    /* The QR image is black on white by construction; the pad keeps a quiet zone on dark surfaces. */
+    background: var(--on-presence);
+  }
+
+  .two-factor-setup__key {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .two-factor-setup__text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .recovery-codes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .recovery-codes__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* --- sessions ----------------------------------------------------------- */
+
+  .sessions__device {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .sessions__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .sessions__unknown {
+    color: var(--text-muted);
+  }
+
+  /* --- usage -------------------------------------------------------------- */
+
+  .usage__meters {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: var(--width-prose);
+  }
+
+  /* --- phone -------------------------------------------------------------- */
+
+  @media (max-width: 899px) {
+    .account-page__body {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-4);
+    }
+
+    .account-nav {
+      position: static;
+      margin: 0 calc(-1 * var(--gutter));
+      padding: 0 var(--gutter) var(--space-2);
+      overflow-x: auto;
+      scrollbar-width: none;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .account-nav__list {
+      flex-direction: row;
+      gap: var(--space-1);
+    }
+
+    .account-nav__link {
+      flex: none;
+      min-height: var(--control-h-touch);
+      padding: 0 var(--space-3);
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+    }
+
+    .account-nav__link[aria-current='page'] {
+      box-shadow: none;
+    }
+
+    .account-form__actions > *,
+    .account-card__actions > *,
+    .sessions__actions > *,
+    .recovery-codes__actions > * {
+      flex: 1 1 100%;
+    }
+
+    .two-factor-setup__scan {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .two-factor-setup__key {
+      width: 100%;
+    }
+  }
+}

@@ -1,0 +1,99 @@
+# When to wake somebody up. Each rule says what is wrong and what to look at.
+groups:
+  - name: platform
+    rules:
+      - alert: PlatformApiDown
+        expr: up{job="platform"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: The platform API is not answering
+          description: Prometheus has not been able to read the API's metrics for 2 minutes. Check `docker compose ps` and the api container's logs.
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(platform_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(platform_http_requests_total[5m])), 1e-9) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: More than 5% of requests are failing
+          description: Over the last 10 minutes more than 1 request in 20 answered with a server error. The api logs name the failing routes.
+
+      - alert: SlowResponses
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(platform_http_request_duration_seconds_bucket[5m]))) > 2
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Requests are slow
+          description: The slowest 5% of requests have taken over 2 seconds for 15 minutes. Check database and host load.
+
+      - alert: EventLoopBlocked
+        expr: platform_nodejs_eventloop_lag_p99_seconds > 0.5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: The API process is stalling
+          description: The API's event loop has been delayed by over half a second (p99) for 10 minutes; everything it serves is slow.
+
+      - alert: JobsFailing
+        expr: delta(platform_jobs{status="FAILED"}[1h]) > 5
+        labels: { severity: warning }
+        annotations:
+          summary: Background jobs are failing
+          description: More than 5 jobs (environment starts or builds) failed in the last hour. The worker's logs say why.
+
+      - alert: JobsPilingUp
+        expr: sum(platform_jobs{status="QUEUED"}) > 50
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Work is queueing faster than it is done
+          description: Over 50 jobs have been waiting for 15 minutes. Is the worker running, and is the host full?
+
+  - name: server
+    rules:
+      - alert: DiskAlmostFull
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) < 0.10
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Disk almost full on {{ $labels.mountpoint }}'
+          description: Less than 10% free. Users' containers and images live on the Docker disk; `docker system df` shows where it went.
+
+      - alert: MemoryAlmostFull
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Server memory almost exhausted
+          description: Less than 10% of memory has been free for 10 minutes. Consider lowering per-account limits or adding a host.
+
+      - alert: HostUnreachable
+        expr: up{job="node"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Server metrics are not being collected
+          description: node-exporter has not answered for 5 minutes.
+
+  - name: backups
+    rules:
+      - alert: BackupStale
+        expr: time() - platform_backup_last_success_timestamp_seconds > 2 * 24 * 3600
+        for: 30m
+        labels: { severity: critical }
+        annotations:
+          summary: No successful backup for over two days
+          description: The backup service has not completed a backup in 48 hours. Its logs say why; a restore is only as recent as the last good backup.
+
+      - alert: BackupNeverRan
+        expr: absent(platform_backup_last_success_timestamp_seconds)
+        for: 2h
+        labels: { severity: warning }
+        annotations:
+          summary: No backup has ever been recorded
+          description: The backup service has not reported a successful backup since monitoring started.

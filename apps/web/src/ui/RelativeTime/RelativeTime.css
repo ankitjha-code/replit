@@ -1,0 +1,9 @@
+@layer ui {
+  .ui-relative-time {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-decoration: underline dotted;
+    text-decoration-color: var(--border-input);
+    text-underline-offset: 3px;
+  }
+}

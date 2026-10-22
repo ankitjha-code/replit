@@ -1,0 +1,466 @@
+/*
+ * The Monitoring page (Monitoring, Alerts) and the Logs page. Feature layer:
+ * screen layout only; every control is a primitive from src/ui.
+ */
+@layer feature {
+  .observe-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .observe-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .observe-note {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .observe-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: var(--width-prose);
+  }
+
+  .observe-form__actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .observe-field-error {
+    margin: var(--space-1) 0 0;
+    color: var(--danger);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .observe-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  /* --- monitoring --------------------------------------------------------- */
+
+  .monitoring-workload {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .monitoring-workload:first-of-type {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .monitoring-workload__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    min-height: var(--control-h-md);
+  }
+
+  .monitoring-workload__name {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  .monitoring-workload__label {
+    font-family: var(--font-mono);
+    font-size: var(--mono-sm);
+    font-weight: var(--weight-regular);
+    color: var(--text-secondary);
+  }
+
+  .monitoring-workload__read {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .monitoring-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-3);
+  }
+
+  /* The tile's label already names the measurement; the meter's own label is
+     kept for assistive technology and hidden from the eye. */
+  .monitoring-tiles .ui-meter {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-top: var(--space-1);
+  }
+
+  .monitoring-tiles .ui-meter__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .monitoring-tile__none {
+    color: var(--text-muted);
+    font-size: var(--text-md);
+    font-weight: var(--weight-regular);
+  }
+
+  /* --- sparkline ---------------------------------------------------------- */
+
+  .sparkline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .sparkline__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .sparkline__value {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sparkline__plot {
+    position: relative;
+    height: 48px;
+    border-radius: var(--radius-2);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+
+  .sparkline__svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    color: var(--text-secondary);
+  }
+
+  .sparkline__line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .sparkline__area {
+    fill: currentColor;
+    opacity: 0.08;
+  }
+
+  .sparkline__dot {
+    fill: currentColor;
+  }
+
+  .sparkline__cursor {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .sparkline__collecting {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .sparkline__tip {
+    position: absolute;
+    top: var(--space-1);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-1);
+    background: var(--bg-overlay);
+    box-shadow: var(--shadow-1);
+    color: var(--text-primary);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+
+  /* --- alerts ------------------------------------------------------------- */
+
+  .alerts-events {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .alerts-events__title {
+    margin: 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  /* --- logs toolbar ------------------------------------------------------- */
+
+  .logs-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .logs-toolbar__select {
+    flex: 1 1 160px;
+    min-width: 140px;
+  }
+
+  .logs-toolbar__search {
+    flex: 2 1 220px;
+    min-width: 180px;
+  }
+
+  .logs-toolbar__follow {
+    flex: none;
+  }
+
+  .logs-toolbar__spacer {
+    flex: 1 1 auto;
+  }
+
+  .logs-applied {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .logs-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .logs-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .logs-legend__swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--danger);
+  }
+
+  /* --- logs viewer -------------------------------------------------------- */
+
+  .logs-viewer {
+    height: 480px;
+    max-height: 60vh;
+    min-height: 240px;
+    overflow: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2);
+    background: var(--bg-canvas);
+    font-family: var(--font-mono);
+    font-size: var(--mono-xs);
+    line-height: 20px;
+    color: var(--text-primary);
+    overscroll-behavior: contain;
+  }
+
+  .logs-viewer:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  .log-line {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: var(--space-2);
+    height: 20px;
+    padding: 0 var(--space-3);
+    white-space: pre;
+    overflow: hidden;
+  }
+
+  .log-line:hover {
+    background: var(--bg-hover);
+  }
+
+  .log-line__time {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .log-line__source {
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-caps);
+    align-self: center;
+  }
+
+  .log-line__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-line--stderr .log-line__text {
+    color: var(--danger);
+  }
+
+  .log-line--stderr .log-line__source {
+    color: var(--danger);
+  }
+
+  .logs-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  /* ANSI colour codes the program printed (lib/ansi.ts classes). */
+  .logs-viewer .ansi-fg-black {
+    color: var(--ansi-black);
+  }
+  .logs-viewer .ansi-fg-red {
+    color: var(--ansi-red);
+  }
+  .logs-viewer .ansi-fg-green {
+    color: var(--ansi-green);
+  }
+  .logs-viewer .ansi-fg-yellow {
+    color: var(--ansi-yellow);
+  }
+  .logs-viewer .ansi-fg-blue {
+    color: var(--ansi-blue);
+  }
+  .logs-viewer .ansi-fg-magenta {
+    color: var(--ansi-magenta);
+  }
+  .logs-viewer .ansi-fg-cyan {
+    color: var(--ansi-cyan);
+  }
+  .logs-viewer .ansi-fg-white {
+    color: var(--ansi-white);
+  }
+  .logs-viewer .ansi-fg-bright-black {
+    color: var(--ansi-bright-black);
+  }
+  .logs-viewer .ansi-fg-bright-red {
+    color: var(--ansi-red);
+  }
+  .logs-viewer .ansi-fg-bright-green {
+    color: var(--ansi-green);
+  }
+  .logs-viewer .ansi-fg-bright-yellow {
+    color: var(--ansi-yellow);
+  }
+  .logs-viewer .ansi-fg-bright-blue {
+    color: var(--ansi-blue);
+  }
+  .logs-viewer .ansi-fg-bright-magenta {
+    color: var(--ansi-magenta);
+  }
+  .logs-viewer .ansi-fg-bright-cyan {
+    color: var(--ansi-cyan);
+  }
+  .logs-viewer .ansi-fg-bright-white {
+    color: var(--ansi-white);
+  }
+  .logs-viewer .ansi-bg-black {
+    background: var(--ansi-black);
+  }
+  .logs-viewer .ansi-bg-red {
+    background: var(--ansi-red);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-green {
+    background: var(--ansi-green);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-yellow {
+    background: var(--ansi-yellow);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-blue {
+    background: var(--ansi-blue);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-magenta {
+    background: var(--ansi-magenta);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-cyan {
+    background: var(--ansi-cyan);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bg-white {
+    background: var(--ansi-white);
+    color: var(--bg-canvas);
+  }
+  .logs-viewer .ansi-bold {
+    font-weight: var(--weight-semibold);
+  }
+  .logs-viewer .ansi-dim {
+    opacity: 0.7;
+  }
+  .logs-viewer .ansi-italic {
+    font-style: italic;
+  }
+  .logs-viewer .ansi-underline {
+    text-decoration: underline;
+  }
+
+  /* --- phone -------------------------------------------------------------- */
+
+  @media (max-width: 719px) {
+    .monitoring-workload__read {
+      margin-left: 0;
+      flex-basis: 100%;
+    }
+
+    .logs-toolbar__select,
+    .logs-toolbar__search {
+      flex-basis: 100%;
+    }
+
+    .logs-viewer {
+      height: 360px;
+    }
+  }
+}

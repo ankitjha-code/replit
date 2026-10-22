@@ -1,0 +1,181 @@
+/*
+ * The preview panel (design spec 9.8): a 28px address bar over the framed
+ * page, or the empty states that say what to do next. Feature layer, tokens
+ * only.
+ */
+@layer feature {
+  .preview-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--bg-base);
+    container-type: inline-size;
+    container-name: preview;
+  }
+
+  .preview-panel__empty {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .preview-panel .preview-panel__empty {
+    flex: 1 1 auto;
+    height: auto;
+  }
+
+  .preview-panel__ports {
+    display: block;
+    margin-top: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .preview-panel__center {
+    padding: var(--space-3);
+  }
+
+  .preview-panel__skeleton {
+    flex: 1 1 auto;
+    margin: var(--space-3);
+    width: auto;
+  }
+
+  .preview-panel__opening {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-3);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  /* --- bar ------------------------------------------------------------------ */
+
+  .preview-bar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--control-h-md);
+    padding: 0 var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .preview-bar__icon {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+  }
+
+  .preview-bar__port {
+    flex: 0 0 auto;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .preview-bar__url {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .preview-bar__url .ui-input {
+    font-size: var(--mono-xs);
+    text-overflow: ellipsis;
+  }
+
+  .preview-bar__url .ui-input__trailing {
+    display: flex;
+  }
+
+  .preview-bar__url .ui-input__trailing .ui-button {
+    height: calc(var(--control-h-sm) - var(--space-1));
+    width: calc(var(--control-h-sm) - var(--space-1));
+    padding: 0;
+  }
+
+  .preview-bar__reload,
+  .preview-bar__tab,
+  .preview-bar__share {
+    flex: 0 0 auto;
+  }
+
+  /* The width toggle earns its room only where the column is wide enough. */
+  .preview-bar__device {
+    flex: 0 0 auto;
+    display: none;
+  }
+
+  @container preview (min-width: 420px) {
+    .preview-bar__device {
+      display: inline-flex;
+    }
+  }
+
+  /* Phone: the primitives grow to touch size, so the bar grows with them. */
+  @media (max-width: 767px) {
+    .preview-bar {
+      height: auto;
+      min-height: var(--control-h-md);
+      padding-block: var(--space-1);
+    }
+
+    .preview-bar__url .ui-input__trailing .ui-button {
+      min-height: 0;
+      min-width: 0;
+      height: calc(var(--control-h-touch) - var(--space-1));
+      width: calc(var(--control-h-touch) - var(--space-1));
+    }
+  }
+
+  /* --- frame ---------------------------------------------------------------- */
+
+  .preview-frame {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  .preview-frame--phone {
+    background: var(--bg-canvas);
+  }
+
+  .preview-frame__progress {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: var(--z-sticky);
+  }
+
+  .preview-frame__slow {
+    position: absolute;
+    inset: var(--space-2) var(--space-2) auto var(--space-2);
+    z-index: var(--z-sticky);
+  }
+
+  /*
+   * A page with no background of its own expects a fresh browser's: light,
+   * whatever the workspace theme. `Canvas` under a light colour scheme is
+   * exactly that, without a raw colour here.
+   */
+  .preview-frame__page {
+    flex: 1 1 auto;
+    max-width: 100%;
+    min-height: 0;
+    border: 0;
+    color-scheme: light;
+    background: Canvas;
+  }
+
+  .preview-frame--phone .preview-frame__page {
+    flex: 0 0 auto;
+    border-inline: 1px solid var(--border-strong);
+  }
+}

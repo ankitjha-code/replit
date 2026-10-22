@@ -1,0 +1,144 @@
+/*
+ * First-run surfaces on the projects home (design spec 8.3): the
+ * getting-started checklist and the verify-email note. Tokens only.
+ */
+@layer feature {
+  .getting-started {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .getting-started__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .getting-started__title {
+    margin: 0;
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  /* The bar reads as progress, so the label is only for assistive technology. */
+  .getting-started__meter {
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    max-width: 240px;
+    margin-left: auto;
+  }
+
+  .getting-started__meter .ui-meter__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .getting-started__loading {
+    padding: var(--space-1) 0;
+  }
+
+  .checklist {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .checklist__item {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .checklist__item:first-child {
+    border-top: 0;
+  }
+
+  .checklist__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    transition:
+      background-color var(--duration-slow) var(--ease-standard),
+      color var(--duration-slow) var(--ease-standard),
+      transform var(--duration-slow) var(--ease-standard);
+  }
+
+  .checklist__item[data-done='true'] .checklist__mark {
+    background: var(--ok-bg);
+    color: var(--ok);
+    animation: checklist-tick var(--duration-slow) var(--ease-standard);
+  }
+
+  @keyframes checklist-tick {
+    from {
+      transform: scale(0.6);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  .checklist__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .checklist__label {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  .checklist__item[data-done='true'] .checklist__label {
+    color: var(--text-secondary);
+  }
+
+  .checklist__detail {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--text-muted);
+  }
+
+  .checklist__action {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--leading-sm);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    white-space: nowrap;
+  }
+
+  .checklist__action:empty {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .checklist__item {
+      grid-template-columns: 20px minmax(0, 1fr);
+    }
+
+    .checklist__action {
+      grid-column: 2;
+    }
+
+    .getting-started__meter {
+      max-width: 140px;
+    }
+  }
+}

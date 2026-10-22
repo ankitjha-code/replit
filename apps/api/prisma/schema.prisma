@@ -1,0 +1,1654 @@
+// Platform database schema.
+//
+// This is the control plane's own database. It holds users, projects,
+// permissions and metadata about runtimes and deployments. It is NOT the
+// database a user's application receives: that is provisioned separately with
+// its own lifecycle, so a user's code can never reach platform state.
+//
+// Entities are introduced as the tasks that need them land, not all at once.
+// The schema changes only through migrations.
+
+// Generated into the package rather than node_modules. Under pnpm, several
+// hard-linked copies of @prisma/client can exist side by side, and generating
+// into whichever one happens to be linked makes the build depend on install
+// ordering. An explicit path removes that class of failure entirely.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7 keeps connection details out of the schema. The URL for migrations
+// lives in prisma.config.ts, and the running client is handed an explicit
+// connection pool through a driver adapter (see src/db/client.ts), which puts
+// pool sizing and timeouts under the platform's control rather than the ORM's.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+/// A person with an account on the platform.
+model User {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// Stored already lowercased and trimmed. Postgres compares text
+  /// case-sensitively, so normalisation happens before the write and the
+  /// unique index then genuinely prevents duplicate accounts.
+  email String @unique @db.VarChar(320)
+
+  /// Public handle. Appears in URLs and alongside a user's presence, so it is
+  /// deliberately narrower than the display name.
+  username String @unique @db.VarChar(39)
+
+  /// Argon2id output, which embeds its own salt and parameters. The plaintext
+  /// password never reaches the database in any form.
+  passwordHash String @db.Text
+
+  displayName String? @db.VarChar(100)
+
+  /// When this address was proved to belong to whoever holds the account.
+  ///
+  /// Null means unproved, which is every account made before this existed and
+  /// every account made on an installation that cannot send mail. Deliberately
+  /// a timestamp rather than a flag: "when" answers questions a boolean cannot,
+  /// and an unverified account is not a special kind of account — it is one that
+  /// has not done something yet.
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+
+  /// Whether this account may see and act on the installation as a whole.
+  ///
+  /// A flag rather than a role table, because there are exactly two kinds of
+  /// account and inventing a hierarchy for the second one would be building for
+  /// a shape nobody has asked for.
+  ///
+  /// It grants an installation-wide *view* and a small set of installation-wide
+  /// actions. It does **not** grant access to any project: an operator sees that
+  /// a project exists, who owns it and what it is consuming, and cannot open its
+  /// files, read its secrets or see its logs. That boundary is the difference
+  /// between an operator and a backdoor, and it is enforced by operators having
+  /// no membership rather than by anything remembering to check.
+  isOperator Boolean @default(false)
+
+  /// The shared secret for a second factor, sealed like a project secret.
+  ///
+  /// Set when somebody starts turning two-factor sign-in on; it does nothing
+  /// until `totpEnabledAt` is set, which only happens once they have proved
+  /// their authenticator produces the right codes. A secret that was never
+  /// confirmed is replaced by the next attempt, not honoured.
+  totpSecret    Bytes?
+  totpEnabledAt DateTime? @db.Timestamptz(3)
+
+  /// The last time-step a code was accepted for.
+  ///
+  /// A code is valid for a thirty-second window, so without this the same six
+  /// digits read over somebody's shoulder would work twice.
+  totpLastStep Int?
+
+  recoveryCodes TotpRecoveryCode[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  sessions             Session[]
+  tokens               AccountToken[]
+  /// Projects this user can reach, at whatever level. Includes the ones they
+  /// own: ownership is a membership, not a separate concept.
+  memberships          ProjectMember[]
+  ownedProjects        Project[]                @relation("ProjectOwner")
+  /// Runtime changes this user asked for. Audit only.
+  requestedRuntimes    Runtime[]                @relation("RuntimeRequestedBy")
+  previewGrants        PreviewGrant[]
+  uploadedAssets       ProjectAsset[]           @relation("AssetUploadedBy")
+  createdSnapshots     ProjectSnapshot[]        @relation("SnapshotCreatedBy")
+  requestedDeployments Deployment[]             @relation("DeploymentRequestedBy")
+  updatedSecrets       ProjectSecret[]          @relation("SecretUpdatedBy")
+  createdBackups       ProjectDatabaseBackup[]  @relation("BackupCreatedBy")
+  terminals            ProjectTerminalSession[] @relation("TerminalOwner")
+  operatorActions      OperatorAuditEntry[]     @relation("AuditActor")
+  previewShares        PreviewShare[]           @relation("PreviewShareCreatedBy")
+  updatedVariables     ProjectVariable[]        @relation("VariableUpdatedBy")
+  quotaOverrides       AccountQuotaOverride[]   @relation("QuotaOverrides")
+
+  @@map("users")
+}
+
+/// A logged-in browser session.
+///
+/// Sessions are server-side and opaque: the browser holds a random token, and
+/// the database holds only its hash. A dump of this table therefore cannot be
+/// replayed to impersonate anyone.
+model Session {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the session token. Never the token itself.
+  tokenHash String @unique @db.Char(64)
+
+  expiresAt DateTime @db.Timestamptz(3)
+
+  /// Refreshed on use, so an idle session can be expired separately from an
+  /// absolute lifetime, and so a user can see where they are signed in.
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Truncated before storage. Diagnostic only; never used for authorization,
+  /// because both values are attacker-controlled.
+  userAgent String? @db.VarChar(256)
+  ipAddress String? @db.Inet
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Deleting the user removes their sessions. Supports "sign out everywhere".
+  @@index([userId])
+  /// Lets expired-session cleanup scan without touching the whole table.
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Something an operator did to the installation.
+///
+/// A table rather than log lines, because the question it answers — "who made
+/// this person an operator, and when?" — is asked long after logs have rotated,
+/// usually by somebody who was not there. Rows are only ever inserted: nothing
+/// in the platform updates or deletes one, so the record cannot be tidied by the
+/// people it records.
+/// One account's ceiling for one kind of concurrent work, set by an operator.
+///
+/// Absent means the installation's default. A row per kind rather than three
+/// nullable columns on the user, so a fourth kind of limit is a new value and
+/// not a migration of the users table.
+model AccountQuotaOverride {
+  userId String @db.Uuid
+  user   User   @relation("QuotaOverrides", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// One of the shared QUOTA_KINDS. Checked by a constraint in the migration.
+  kind String @db.VarChar(32)
+
+  limit Int
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([userId, kind])
+  @@map("account_quota_overrides")
+}
+
+model OperatorAuditEntry {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// Who did it. Nulled rather than cascading, so closing an operator's account
+  /// does not erase what they did.
+  actorId String? @db.Uuid
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// The actor's username at the time, kept beside the id so the record still
+  /// reads after the account is gone.
+  actorName String @db.VarChar(39)
+
+  /// A short, stable verb: `operator.grant`, `operator.revoke`, `sweep.run`.
+  action String @db.VarChar(64)
+
+  /// Who or what it was done to, when that is an account.
+  targetId   String? @db.Uuid
+  targetName String? @db.VarChar(39)
+
+  /// The rest of what happened, as data rather than prose. Never a secret.
+  detail Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Newest first, which is how an audit trail is read.
+  @@index([createdAt])
+  @@map("operator_audit_entries")
+}
+
+/// A single-use way in for somebody who has lost their authenticator.
+///
+/// Stored as a hash, like a session token: shown once when generated, and never
+/// again. Using one marks it used rather than deleting it, so how many remain is
+/// something the account page can say.
+model TotpRecoveryCode {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash String    @unique @db.Char(64)
+  usedAt   DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("totp_recovery_codes")
+}
+
+/// What a one-time link is for.
+///
+/// A closed set, and the two are kept apart rather than sharing one row type
+/// with a nullable field. They differ in what presenting one *does*: verifying
+/// an address proves something, while resetting a password changes the
+/// credential that protects the account. A query that could confuse them would
+/// let a verification link set a password.
+enum AccountTokenKind {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  /// The half-finished sign-in of somebody with a second factor: password
+  /// accepted, code not yet given. Minutes, not days, and never a session.
+  LOGIN_CHALLENGE
+
+  @@map("account_token_kind")
+}
+
+/// A single-use link the platform sent to an address.
+///
+/// The row holds a hash, never the token, for exactly the reason sessions do: a
+/// dump of this table must not be replayable. Unlike a session, the token is
+/// carried in a URL — which is copied, logged by intermediaries and left in
+/// browser history — so these are short-lived and die on first use.
+model AccountToken {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind AccountTokenKind
+
+  /// SHA-256 of the token. Never the token itself.
+  tokenHash String @unique @db.Char(64)
+
+  /// The address this was sent to.
+  ///
+  /// Recorded rather than read from the user at redemption time, so that a
+  /// verification proves the address it was *sent* to. Without it, changing an
+  /// address and then following an older link would mark the new address
+  /// verified on the strength of a message delivered to the old one.
+  email String @db.VarChar(320)
+
+  expiresAt DateTime @db.Timestamptz(3)
+
+  /// When it was redeemed. Set rather than deleted, so a second attempt can be
+  /// told apart from a link that never existed.
+  usedAt DateTime? @db.Timestamptz(3)
+
+  /// Wrong answers given against it, for a sign-in challenge. Six digits is a
+  /// million possibilities; a challenge is burned after a handful of misses so
+  /// it cannot be walked.
+  attempts Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Finding a user's outstanding tokens, which is how a new request invalidates
+  /// the ones before it.
+  @@index([userId, kind])
+  /// Lets expired-token cleanup scan without touching the whole table.
+  @@index([expiresAt])
+  @@map("account_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Projects and access
+// ---------------------------------------------------------------------------
+
+/// Access levels, ordered so each contains the one below.
+///
+/// Mirrors PROJECT_ROLES in packages/shared. The database enum exists so an
+/// invalid role cannot be written even by a direct query; the shared table is
+/// what decides which capabilities each role implies.
+enum ProjectRole {
+  VIEWER
+  EDITOR
+  OWNER
+
+  @@map("project_role")
+}
+
+/// The central unit of the platform: an application and everything about it.
+///
+/// This holds identity and metadata only. Files, runtimes, secrets and
+/// deployments hang off it as those capabilities are built, each with its own
+/// lifecycle, so that destroying a runtime never touches the project.
+model Project {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// URL segment. Lowercase and hyphenated, unique within one owner's account
+  /// so two people may both have a project called "api".
+  slug String @db.VarChar(63)
+
+  name String @db.VarChar(100)
+
+  description String? @db.VarChar(500)
+
+  /// How to start this project's application.
+  ///
+  /// Null means the platform suggests one from the project's files. Stored on
+  /// the project rather than on the runtime because it outlives any container:
+  /// a project that was stopped and started again should not need telling
+  /// twice.
+  runCommand String? @db.VarChar(2000)
+
+  /// The account the project belongs to: what scopes the slug, and where
+  /// quota and billing would attach.
+  ///
+  /// Denormalised on purpose. Access checks never read it; they read the
+  /// membership below, so there is exactly one code path for authorization.
+  /// The owner always has a matching OWNER membership, created in the same
+  /// transaction as the project.
+  ownerId String @db.Uuid
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members          ProjectMember[]
+  files            ProjectFile[]
+  databaseBackups  ProjectDatabaseBackup[]
+  terminalSessions ProjectTerminalSession[]
+  previewShares    PreviewShare[]
+
+  /// At most one development runtime at a time. A project is one workspace,
+  /// and two containers for it would disagree about what its files are.
+  runtime Runtime?
+
+  previewGrants PreviewGrant[]
+  assets        ProjectAsset[]
+  secrets       ProjectSecret[]
+  variables     ProjectVariable[]
+
+  /// At most one. A project is one application, and two databases for it would
+  /// make "the database" an ambiguous phrase in every conversation about it.
+  database  ProjectDatabase?
+  snapshots ProjectSnapshot[]
+
+  /// At most one. A project is one line of history.
+  repository ProjectRepository?
+
+  deployments      Deployment[]
+  /// At most one. How this project is built and started when it is deployed.
+  deploymentConfig ProjectDeploymentConfig?
+  domains          ProjectDomain[]
+  logLines         ProjectLogLine[]
+  jobs             Job[]
+
+  /// How this project's own application is checked, when something is running.
+  ///
+  /// On the project rather than on a deployment, because it is a fact about the
+  /// application rather than about one release of it: the same path is the right
+  /// one to ask for in the workspace and in production. Null means the default,
+  /// so a project that has never thought about it is not carrying a stored
+  /// answer that only happens to match.
+  healthCheckPath      String? @db.VarChar(200)
+  healthCheckTimeoutMs Int?
+
+  /// The label this project's deployment answers on, under the platform's own
+  /// domain.
+  ///
+  /// Unique across the whole installation, unlike the slug, which is unique
+  /// only within an owner's account: a subdomain sits directly under the
+  /// platform's domain and two projects cannot share one. Null until the
+  /// project is first deployed, because a name nobody is using is a name taken
+  /// from everybody else for nothing.
+  deploymentSubdomain String? @unique @db.VarChar(63)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  alertSettings ProjectAlertSettings?
+  gitRemote     ProjectGitRemote?
+  alertEvents   ProjectAlertEvent[]
+
+  @@unique([ownerId, slug])
+  /// Listing a user's own projects, newest first.
+  @@index([ownerId, createdAt])
+  @@map("projects")
+}
+
+/// A user's access to one project.
+///
+/// The single source of truth for authorization. Every project-scoped request
+/// resolves to a row here or is refused.
+model ProjectMember {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role ProjectRole
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// One role per person per project. Two rows could disagree, and whichever
+  /// the query happened to return first would decide access.
+  @@unique([projectId, userId])
+  /// Listing the projects a user can reach.
+  @@index([userId])
+  @@map("project_members")
+}
+
+// ---------------------------------------------------------------------------
+// Project files
+// ---------------------------------------------------------------------------
+
+enum ProjectFileType {
+  FILE
+  DIRECTORY
+
+  @@map("project_file_type")
+}
+
+/// One file or directory in a project.
+///
+/// This table is the source of truth for a project's source. A development
+/// container receives a copy of it and may change it, but destroying every
+/// container on the host must lose nothing: what is here is what the project
+/// is.
+///
+/// Content lives in the database rather than object storage because source
+/// files are small, are read and written constantly while editing, and benefit
+/// from being transactional with the metadata beside them. Large binaries are
+/// refused by a size cap and belong in project asset storage, which is a
+/// separate concern with a separate lifecycle.
+model ProjectFile {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Normalised, project-relative, no leading separator. The root is implicit
+  /// and has no row.
+  path String @db.VarChar(1024)
+
+  /// The containing directory, empty for a child of the root. Denormalised so
+  /// listing one directory is an index lookup rather than a scan with string
+  /// arithmetic.
+  parentPath String @db.VarChar(1024)
+
+  /// The final path segment, kept so sorting and searching by name need no
+  /// per-row parsing.
+  name String @db.VarChar(255)
+
+  type ProjectFileType
+
+  /// Null for a directory. Bytes rather than text so a file that is not valid
+  /// UTF-8 round-trips unchanged instead of being corrupted on the way in.
+  content Bytes?
+
+  /// Byte length, so a listing and a quota check need not read the content.
+  size Int @default(0)
+
+  /// SHA-256 of the content. Lets a later snapshot or sync skip a file that
+  /// has not changed without transferring it.
+  checksum String? @db.Char(64)
+
+  /// True when the content did not decode as UTF-8. Content search and the
+  /// text editor both skip these.
+  isBinary Boolean @default(false)
+
+  /// Incremented on every write. A writer that supplies the version it expects
+  /// gets a conflict instead of silently overwriting a concurrent save.
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// One entry per path. Without this a file and a directory could share a
+  /// path and the tree would be ambiguous.
+  @@unique([projectId, path])
+  /// Listing the contents of one directory.
+  @@index([projectId, parentPath])
+  /// Prefix queries over a subtree, for moving and deleting directories.
+  @@index([projectId, path])
+  @@map("project_files")
+}
+
+// ---------------------------------------------------------------------------
+// Runtimes
+// ---------------------------------------------------------------------------
+
+/// Lifecycle of the application inside a runtime.
+///
+/// Separate from the runtime's own status on purpose. A container that is up
+/// with a crashed program in it is a state someone needs to see, and a single
+/// status could not express it.
+enum RunStatus {
+  IDLE
+  STARTING
+  RUNNING
+  EXITED
+  FAILED
+
+  @@map("run_status")
+}
+
+/// Lifecycle of a development runtime.
+///
+/// Mirrors RUNTIME_STATUSES in packages/shared, which also owns the table of
+/// legal transitions. The database enum exists so a value outside the set
+/// cannot be written even by a direct query.
+enum RuntimeStatus {
+  REQUESTED
+  CREATING
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+
+  @@map("runtime_status")
+}
+
+/// The development environment backing one project's workspace.
+///
+/// This row is the control plane's record of a workload, not the workload
+/// itself. It survives the container: destroying every container on the host
+/// leaves these rows describing what should exist, and loses no project data,
+/// because project files live in their own table and never only inside a
+/// container.
+model Runtime {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// One runtime per project. Enforced here rather than in application code,
+  /// because two concurrent start requests would otherwise both find no
+  /// runtime and both create one.
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status RuntimeStatus @default(REQUESTED)
+
+  /// Which execution provider owns `externalId`. A container id means nothing
+  /// to a provider that did not create it, so the two are read together.
+  provider String @db.VarChar(32)
+
+  /// The provider's own identifier for the workload, such as a container id.
+  /// Null until the workload has been created.
+  ///
+  /// Opaque above the execution plane. A provider that spreads work across
+  /// machines encodes which one into it; nothing outside that plane reads it.
+  externalId String? @db.VarChar(128)
+
+  /// Which machine it was placed on.
+  ///
+  /// Recorded separately from the identifier, even though the identifier also
+  /// carries it, because this is what the scheduler counts: working out what is
+  /// on each host by parsing an opaque column would make that encoding something
+  /// the whole platform depended on. Both are written at the one moment the
+  /// placement is decided, so they cannot disagree. Null for a runtime created
+  /// before there was more than one host.
+  executionHost String? @db.VarChar(32)
+
+  /// Runtime identity, resolved when the runtime was requested. Stored rather
+  /// than re-derived, so a running container is described by what it actually
+  /// is and not by what the project's files imply today.
+  ///
+  /// Plain text rather than an enum: the set of supported languages grows, and
+  /// that should not need a migration. The catalogue in packages/shared is
+  /// what decides which values are meaningful.
+  language String @db.VarChar(32)
+  version  String @db.VarChar(32)
+  image    String @db.VarChar(200)
+
+  /// Resource ceiling the provider must apply. Recorded per runtime rather
+  /// than read from configuration at stop time, so a limit change does not
+  /// retroactively describe a container that was started under the old one.
+  cpuMillicores Int
+  memoryMb      Int
+  pidsLimit     Int
+
+  /// The application inside the container, if one has been started.
+  ///
+  /// Kept on the runtime rather than in memory so it survives a control plane
+  /// restart: the program carries on running inside the container either way,
+  /// and a platform that forgot about it would show nothing and offer no way
+  /// to stop it.
+  runStatus    RunStatus @default(IDLE)
+  /// What was actually run, which may differ from what is configured now.
+  runCommand   String?   @db.VarChar(2000)
+  runStartedAt DateTime? @db.Timestamptz(3)
+  runExitedAt  DateTime? @db.Timestamptz(3)
+  /// Null while running, and when the platform could not learn it.
+  runExitCode  Int?
+  /// Why the application is in this state. Written to be shown.
+  runMessage   String?   @db.VarChar(500)
+
+  /// The container port an application was last found listening on.
+  ///
+  /// Remembered so every preview request is not a round of probing. Cleared
+  /// when the runtime stops, because what was listening then says nothing
+  /// about what will be listening next time.
+  previewPort Int?
+
+  /// Why the runtime is in its current state, when that needs saying. Carries
+  /// the reason a start failed, written to be safe to show a user: provider
+  /// detail belongs in the logs.
+  message String? @db.VarChar(500)
+
+  /// Incremented on every status change. A transition supplies the revision it
+  /// expects, so two requests racing to move the same runtime cannot both
+  /// succeed.
+  revision Int @default(0)
+
+  /// Who last asked for a change. Kept for audit; nulled rather than cascading
+  /// so removing an account does not erase the runtime's history.
+  requestedById String? @db.Uuid
+  requestedBy   User?   @relation("RuntimeRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  statusChangedAt DateTime  @default(now()) @db.Timestamptz(3)
+  startedAt       DateTime? @db.Timestamptz(3)
+  stoppedAt       DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  events    RuntimeEvent[]
+  terminals ProjectTerminalSession[]
+
+  /// Finding runtimes to reconcile against the execution plane, and answering
+  /// "what is running right now" without scanning.
+  @@index([status])
+  @@map("runtimes")
+}
+
+/// An environment variable a project needs, kept where nobody can read it.
+///
+/// The value is stored encrypted and is never returned by any endpoint. It is
+/// decrypted in exactly one place: on its way into a container. Someone who
+/// forgets a value sets it again, which is a far better outcome than an
+/// interface that can be used to read every credential a project has.
+model ProjectSecret {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// The environment variable's name. Not secret: what it is called is often
+  /// obvious from the project's own code.
+  key String @db.VarChar(128)
+
+  /// AES-256-GCM output, with the nonce and the authentication tag in front of
+  /// the ciphertext. Bytes rather than text: this is not text, and storing it
+  /// as such invites something to try to decode it.
+  ///
+  /// The tag is what makes this tamper-evident. A value altered in the
+  /// database fails to decrypt rather than becoming a different value that a
+  /// container would then be handed.
+  value Bytes
+
+  /// Characters in the plaintext, so an interface can show a plausible number
+  /// of dots without the value being read.
+  length Int
+
+  /// Who set it last. Kept for audit; nulled rather than cascading so removing
+  /// an account does not delete a project's configuration.
+  updatedById String? @db.Uuid
+  updatedBy   User?   @relation("SecretUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// One value per name per project. Two rows could disagree, and whichever
+  /// the query returned first would decide what the container was given.
+  @@unique([projectId, key])
+  @@map("project_secrets")
+}
+
+/// Lifecycle of the database a project's application gets.
+///
+/// Shorter than a runtime's, because provisioning is a few statements against
+/// a server that is already running rather than pulling an image and starting
+/// a container. There is no STOPPED: a database that exists is available, and
+/// one that does not exist has no row.
+enum DatabaseStatus {
+  CREATING
+  READY
+  FAILED
+
+  @@map("database_status")
+}
+
+/// The database a project's application gets.
+///
+/// This row is the control plane's record of it, not the thing itself. The
+/// database lives in a **separate PostgreSQL server** from this one: the
+/// platform's users, sessions and secrets are in a different server process, so
+/// a project's SQL reaches nothing of the platform's because there is nothing
+/// of the platform's there to reach. Role permissions are not what makes that
+/// true, which means a mistake in them cannot undo it.
+///
+/// Neither the host nor the port is stored. Both are read from configuration
+/// when a connection string is assembled, so moving the server does not strand
+/// every row describing a database that is still perfectly reachable.
+model ProjectDatabase {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// One per project, enforced here rather than in application code, because
+  /// two concurrent requests would otherwise both find none and both create
+  /// one.
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status DatabaseStatus @default(CREATING)
+
+  /// The physical database name in that server. Derived from the project's
+  /// identifier, never from anything a person typed: this ends up inside a SQL
+  /// identifier.
+  name String @unique @db.VarChar(63)
+
+  /// The role that owns it, and the only role allowed to connect to it.
+  role String @unique @db.VarChar(63)
+
+  /// AES-256-GCM output, with the nonce and tag in front of the ciphertext.
+  ///
+  /// Encrypted rather than stored as text because it is a live credential, and
+  /// readable rather than write-only because it is the project's own credential
+  /// for the project's own data: an owner who cannot read it cannot connect any
+  /// tool to their own database. The honest mitigation for a leak is rotating
+  /// it, not hiding it from the person who owns it.
+  password Bytes
+
+  /// Why it is in its current state, when that needs saying. Safe to show.
+  message String? @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  backups ProjectDatabaseBackup[]
+
+  @@map("project_databases")
+}
+
+/// Where a database backup is in its life.
+///
+/// A dump is a container running `pg_dump`, so it takes real time and can fail
+/// halfway — which makes it a state machine rather than a thing that has
+/// happened. RESTORING is not here: restoring is done *from* a backup and its
+/// progress belongs to the database, not to the copy being read.
+enum BackupStatus {
+  RUNNING
+  READY
+  FAILED
+
+  @@map("backup_status")
+}
+
+/// A copy of a project's database, taken at a moment.
+///
+/// The row is bookkeeping; the dump itself is an object in storage, like a
+/// snapshot or a repository archive. Kept out of the platform's own database
+/// for the same reason those are: a copy of somebody's data does not belong in
+/// the control plane's tables, and object storage is where large immutable
+/// things live here.
+model ProjectDatabaseBackup {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  databaseId String          @db.Uuid
+  database   ProjectDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  /// Denormalised so a project's backups can be listed and authorized without
+  /// joining through the database row, and so they cascade with the project.
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status BackupStatus @default(RUNNING)
+
+  /// What somebody called it. Null for one the platform took by itself.
+  note String? @db.VarChar(200)
+
+  /// Where the dump is. Null until it has been written.
+  storageKey String? @unique @db.VarChar(255)
+  sizeBytes  Int?
+
+  /// Why it failed, written to be shown.
+  message String? @db.VarChar(500)
+
+  /// Who asked for it. Nulled rather than cascading, so removing an account
+  /// does not erase a project's backup history.
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("BackupCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+
+  /// Listing one project's backups, newest first.
+  @@index([projectId, createdAt])
+  @@map("project_database_backups")
+}
+
+/// A shell somebody opened in a project.
+///
+/// The row exists so a terminal can be found again after the control plane
+/// restarts. The shell itself is a process inside the container — that is what
+/// makes surviving possible at all — and this records that it is there, who it
+/// belongs to, and which container to look in.
+///
+/// Rows are removed when the session is closed rather than kept as history. A
+/// closed terminal is not a thing anybody wants a record of, and a table that
+/// grew once per terminal opened would be the largest table on the installation
+/// within a week.
+model ProjectTerminalSession {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Whose shell it is.
+  ///
+  /// A session carries one person's history, their half-typed command and their
+  /// working directory. Another member opens their own; nobody resumes somebody
+  /// else's, which is enforced by every lookup being scoped to both.
+  userId String @db.Uuid
+  user   User   @relation("TerminalOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The runtime it lives in. Its container is where the shell actually is.
+  runtimeId String  @db.Uuid
+  runtime   Runtime @relation(fields: [runtimeId], references: [id], onDelete: Cascade)
+
+  /// Whether this one survives a restart.
+  ///
+  /// False when the environment could not support a detached shell and the
+  /// platform fell back to holding the stream itself. Recorded rather than
+  /// inferred, so the interface can say which kind somebody has instead of
+  /// promising a resume that will fail.
+  durable Boolean @default(true)
+
+  rows    Int
+  columns Int
+
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  lastActiveAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Listing one person's terminals in one project.
+  @@index([projectId, userId])
+  @@map("project_terminal_sessions")
+}
+
+/// A project's git repository.
+///
+/// The row is bookkeeping; the repository itself is an archive of the `.git`
+/// directory in object storage. It is kept there rather than on a host's disk
+/// so that nothing about a project's history depends on which machine served
+/// the request that wrote it.
+///
+/// Only the newest commit is recorded here, and only so that "has anything
+/// changed" can be answered without unpacking the whole repository. Git remains
+/// the authority on its own history: this column is a cache of one fact.
+model ProjectRepository {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Where the packed repository is. Generated, never derived from anything
+  /// somebody typed.
+  storageKey String @unique @db.VarChar(255)
+
+  /// The branch commits are made on. One branch for now; branching is not a
+  /// feature yet, and a column is cheaper than a migration when it becomes one.
+  branch String @default("main") @db.VarChar(255)
+
+  /// The newest commit's object id, or null before the first commit.
+  headOid String? @db.Char(40)
+
+  /// SHA-256 of the stored archive, so what comes back can be checked against
+  /// what went in rather than trusted because it arrived.
+  checksum String @db.Char(64)
+
+  /// The archive's size, for the same reason a snapshot records one.
+  sizeBytes Int @default(0)
+
+  commitCount Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_repositories")
+}
+
+/// A named, frozen copy of every source file in a project.
+///
+/// The row is what the platform knows about it; the files themselves are one
+/// archive in object storage, because a snapshot is written once and read
+/// rarely, which is the opposite of what the project_files table is for.
+///
+/// Immutable. There is no update path and no column that would make sense to
+/// change: a snapshot that could be edited is not a record of anything.
+/// Where a deployment is in its life.
+///
+/// Mirrors DEPLOYMENT_STATUSES and DEPLOYMENT_TRANSITIONS in packages/shared,
+/// which is the canonical state machine. The database enum exists so an
+/// invalid status cannot be written even by a direct query; the shared table
+/// decides which moves between them are legal.
+enum DeploymentStatus {
+  REQUESTED
+  BUILDING
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+
+  @@map("deployment_status")
+}
+
+/// What kind of thing a deployment serves.
+///
+/// Two, because they need different infrastructure rather than different
+/// settings: a static site is files behind a web server and never runs the
+/// project's own code, while a server deployment is that code running.
+enum DeploymentTarget {
+  STATIC
+  SERVER
+
+  @@map("deployment_target")
+}
+
+/// A project, running somewhere that is not somebody's workspace.
+///
+/// Distinct from a Runtime in every way that matters. A runtime exists because
+/// a browser tab is open, is seeded from the project's files as they are right
+/// now, and is unreachable from outside. A deployment is built from a fixed
+/// version of the project, is expected to outlive every session and every
+/// restart of this control plane, and is meant to be reachable by people with
+/// no account here.
+///
+/// Many per project, because the history is the point: "what was live last
+/// Tuesday" is a question a deployment record exists to answer.
+model Deployment {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status DeploymentStatus @default(REQUESTED)
+
+  /// This release's own hostname label, unique across the installation.
+  ///
+  /// The project's address always points at whatever is live. This points at
+  /// one release for as long as it is running, which is what makes it possible
+  /// to look at what a change did before pointing everybody at it, and to
+  /// check that a rollback actually went back.
+  ///
+  /// Random rather than derived from the identifier, which is time-ordered and
+  /// would let anybody who has seen one release address guess its neighbours.
+  releaseLabel String? @unique @db.VarChar(32)
+
+  /// The release this one was made from, when it was made by rolling back.
+  ///
+  /// A rollback is a new release pointing at old code, not a resurrection of an
+  /// old row: history stays a list of what happened, and "we went back to the
+  /// version from Tuesday" is a thing that happened.
+  rolledBackFromId String?          @db.Uuid
+  rolledBackFrom   Deployment?      @relation("DeploymentRollback", fields: [rolledBackFromId], references: [id], onDelete: SetNull)
+  rollbacks        Deployment[]     @relation("DeploymentRollback")
+  target           DeploymentTarget
+
+  /// Why this one was made. Shown in the list.
+  note String? @db.VarChar(200)
+
+  /// The configuration actually used, copied rather than referenced.
+  ///
+  /// A deployment that showed the project's current settings would misdescribe
+  /// itself the moment somebody changed them, which is the opposite of what a
+  /// record of a release is for.
+  buildCommand    String? @db.VarChar(2000)
+  outputDirectory String? @db.VarChar(200)
+  startCommand    String? @db.VarChar(2000)
+
+  /// The frozen copy of the project's files this was built from.
+  ///
+  /// What makes a deployment a version rather than a moment in an editing
+  /// session. Nulled rather than cascading when the snapshot is removed, so a
+  /// deployment record survives losing the thing it was built from and says so.
+  snapshotId String?          @db.Uuid
+  snapshot   ProjectSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  /// Which deployment provider owns `externalId`, and its own identifier for
+  /// whatever is serving this. Both null until something is.
+  provider   String? @db.VarChar(32)
+  externalId String? @db.VarChar(128)
+
+  /// Which machine it was placed on, for the same reason a runtime records one.
+  /// Null for a static deployment, which runs nowhere, and for anything created
+  /// before there was more than one host.
+  executionHost String? @db.VarChar(32)
+
+  /// Where it is reachable, once anything serves it.
+  url String? @db.VarChar(500)
+
+  /// The port inside the workload that answered, for a server deployment.
+  ///
+  /// Recorded because the address on the host changes every time a container is
+  /// recreated, and the port inside it does not: the proxy resolves one from the
+  /// other on each request rather than trusting a stale binding.
+  containerPort Int?
+
+  /// What the build printed.
+  ///
+  /// The only useful thing about a failed build, and worth keeping for a
+  /// successful one too. Bounded and tail-trimmed rather than unbounded: a build
+  /// can print for as long as it runs.
+  buildLog          String? @db.Text
+  /// True when the start of the log was dropped to stay inside the ceiling.
+  buildLogTruncated Boolean @default(false)
+
+  /// Where the built static site is stored, and how big it is.
+  ///
+  /// Only for a static deployment: the platform holds the bytes and serves them
+  /// itself, which is why a static site keeps working while the container
+  /// backend is down. A server deployment has no artifact, because what it runs
+  /// never leaves the workload it was built in.
+  artifactKey   String? @unique @db.VarChar(255)
+  artifactBytes Int?
+  /// Files in the artifact, so the page can say what was published.
+  fileCount     Int?
+
+  /// Why it is in its current state. Written to be shown to a person; provider
+  /// detail belongs in the logs.
+  message String? @db.VarChar(500)
+
+  /// Incremented on every status change, so two requests racing to move the
+  /// same deployment cannot both succeed. The same guard the runtime uses.
+  revision Int @default(0)
+
+  /// Who asked for it. Nulled rather than cascading, so removing an account
+  /// does not erase a project's release history.
+  requestedById String? @db.Uuid
+  requestedBy   User?   @relation("DeploymentRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  statusChangedAt DateTime  @default(now()) @db.Timestamptz(3)
+  startedAt       DateTime? @db.Timestamptz(3)
+  stoppedAt       DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  events DeploymentEvent[]
+
+  /// Listing one project's deployments, newest first.
+  @@index([projectId, createdAt])
+  /// Finding what is meant to be serving, without scanning.
+  @@index([status])
+  @@map("deployments")
+}
+
+/// One step in a deployment's life.
+///
+/// The same shape as RuntimeEvent, and for the same reason: a status column
+/// says where something is and nothing about how it got there, and "why did
+/// this fail" is asked after the fact.
+model DeploymentEvent {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  deploymentId String     @db.Uuid
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  /// Null for the first event, when the deployment had no previous status.
+  fromStatus DeploymentStatus?
+  toStatus   DeploymentStatus
+
+  /// Why the transition happened. Safe to show a user.
+  reason String? @db.VarChar(500)
+
+  /// Who caused it, where a person did. Null for platform-initiated changes.
+  actorId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Reading one deployment's history in order.
+  @@index([deploymentId, createdAt])
+  @@map("deployment_events")
+}
+
+/// How a project is deployed, kept once rather than per deployment.
+///
+/// Configuration outlives any one release, exactly as the run command does:
+/// saying how to build a project should not have to be repeated every time it
+/// is built. Each deployment records the configuration it actually used.
+model ProjectDeploymentConfig {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// At most one per project. Two answers to "how is this built" is no answer.
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  target DeploymentTarget
+
+  buildCommand    String? @db.VarChar(2000)
+  outputDirectory String? @db.VarChar(200)
+  startCommand    String? @db.VarChar(2000)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_deployment_configs")
+}
+
+/// What kind of work a job is.
+///
+/// A closed set, because a job type is a handler in the control plane and a
+/// type nobody implements is a row that can never finish.
+enum JobType {
+  RUNTIME_START
+  DEPLOYMENT_BUILD
+
+  @@map("job_type")
+}
+
+/// Where a job is in its life.
+///
+/// QUEUED covers both "never started" and "failed and waiting to be tried
+/// again": from outside they are the same thing, which is work the platform
+/// still intends to do. The attempt count distinguishes them.
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+
+  @@map("job_status")
+}
+
+/// Work the platform does that a request should not wait for.
+///
+/// The row **is** the job. The queue beside it carries only a nudge saying there
+/// is something to do, and a worker that missed one finds the same work by
+/// looking. Letting the queue hold the jobs would mean two stores that can
+/// disagree about what is outstanding, and one of them would be the one that
+/// loses everything when it restarts.
+model Job {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// The project this work is for, when it is for one.
+  ///
+  /// Nullable because platform-wide work is a job too, and cascading is right:
+  /// a deleted project's outstanding work is work nobody wants any more.
+  projectId String?  @db.Uuid
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type   JobType
+  status JobStatus @default(QUEUED)
+
+  /// What the handler needs. Validated against a schema on the way out as well
+  /// as on the way in: a payload written by one version of the platform may be
+  /// read by the next.
+  payload Json
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  /// Higher goes first among work that is due. Set from the job's type when it
+  /// is recorded, so somebody waiting at a spinner is not queued behind a build
+  /// nobody is watching.
+  priority Int @default(0)
+
+  /// What went wrong last time. Written to be shown to a person.
+  lastError String? @db.VarChar(1000)
+
+  /// When it is next due. Later than now while it is backing off, which is how
+  /// a retry is expressed without a second status for it.
+  scheduledAt DateTime @default(now()) @db.Timestamptz(3)
+
+  startedAt  DateTime? @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+
+  /// Which worker holds it, and since when.
+  ///
+  /// Not a lock in the database sense: the claim is a conditional update, and
+  /// this records who won it. `lockedAt` is what lets a later task find work
+  /// whose worker died holding it.
+  lockedBy String?   @db.VarChar(64)
+  lockedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// Claiming the next piece of work, which is the query that has to be fast.
+  @@index([status, priority(sort: Desc), scheduledAt])
+  /// Listing one project's jobs, newest first.
+  @@index([projectId, createdAt])
+  @@map("jobs")
+}
+
+/// Where a custom domain stands.
+///
+/// Nothing is served on one that is not VERIFIED. Anybody can type any hostname
+/// into a form, so a domain is a claim until its owner has proved control of it
+/// by publishing a record in its DNS.
+enum DomainStatus {
+  PENDING
+  VERIFIED
+  FAILED
+
+  @@map("domain_status")
+}
+
+/// A hostname somebody else owns, pointed at a project here.
+///
+/// Separate from the project's own subdomain, which the platform controls and
+/// can simply assign. This one belongs to somebody, and everything about the
+/// model follows from that: a verification token, a status, and a record of
+/// when control was last actually checked rather than assumed.
+model ProjectDomain {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Stored already lowercased and without a trailing dot. Unique across the
+  /// installation: one hostname resolves to one project, and two rows claiming
+  /// it would make which one an accident of query order.
+  hostname String @unique @db.VarChar(253)
+
+  status DomainStatus @default(PENDING)
+
+  /// What to publish in DNS to prove control of the domain.
+  ///
+  /// Random and per domain. Of no use to anybody who does not already control
+  /// the name, because publishing it requires exactly that.
+  verificationToken String @db.VarChar(64)
+
+  /// What the last check saw, when it did not pass. Written to be shown.
+  message String? @db.VarChar(500)
+
+  /// When control was last confirmed, and when it was last looked at.
+  ///
+  /// Both, because they answer different questions: one says whether this was
+  /// ever ours to serve, the other says how stale that answer is.
+  verifiedAt    DateTime? @db.Timestamptz(3)
+  lastCheckedAt DateTime? @db.Timestamptz(3)
+
+  /// How many re-checks in a row found a verified domain no longer pointing here.
+  ///
+  /// Counted rather than acted on at once, because DNS has bad minutes and a
+  /// single failed lookup must not take somebody's site down. Reset by any
+  /// check that finds it pointing here again.
+  consecutiveMisses Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// Listing one project's domains, and finding the ones due a recheck.
+  @@index([projectId, createdAt])
+  @@index([status, lastCheckedAt])
+  @@map("project_domains")
+}
+
+/// Where a line of output came from.
+enum LogSource {
+  /// The project's own application, in its development runtime.
+  RUN
+  /// A deployment, running unattended.
+  DEPLOYMENT
+
+  @@map("log_source")
+}
+
+/// One line a project's application printed, kept.
+///
+/// The durable counterpart to the in-memory buffer the console reads. That
+/// buffer is the right shape for watching something run and the wrong one for
+/// every question asked afterwards, all of which are about output that has
+/// already scrolled past or that a restart threw away.
+///
+/// Deliberately bounded: a project keeps a fixed number of recent lines and the
+/// oldest are dropped. Promising to keep everything would be promising
+/// something the platform cannot pay for.
+model ProjectLogLine {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  source   LogSource
+  /// The runtime or deployment that produced it, so one release's output can be
+  /// read apart from its predecessor's.
+  sourceId String    @db.VarChar(64)
+
+  /// Kept apart because they mean different things to a person reading them.
+  stream String @db.VarChar(8)
+
+  /// Truncated rather than dropped when a program prints without a newline: the
+  /// end of an absurd line is a smaller loss than the line not appearing.
+  message String @db.VarChar(2000)
+
+  /// When the platform observed it, which is not exactly when it was printed.
+  /// The difference is a buffer flush and is not worth pretending otherwise.
+  at DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Reading a project's log backwards, which is the only way one is read.
+  @@index([projectId, at, id])
+  /// Narrowing to one runtime or deployment.
+  @@index([projectId, source, sourceId, at])
+  @@map("project_log_lines")
+}
+
+/// Who asked for a snapshot.
+///
+/// A manual one is a decision somebody made, and it is kept until they undo
+/// that decision. An automatic one is taken by the platform immediately before
+/// a restore, so that a restore can be undone. The two are counted separately:
+/// automatic ones are pruned oldest-first and never fill up the allowance a
+/// person is given, because nobody should be unable to go back on the grounds
+/// that they went back too often.
+enum SnapshotKind {
+  MANUAL
+  AUTOMATIC
+  /// The fixed version a deployment was built from. Never pruned, and never
+  /// counted against what a person may keep: it is what is actually running.
+  DEPLOYMENT
+}
+
+model ProjectSnapshot {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// What a person called this moment. Shown, and nothing more: it never
+  /// becomes a key, a path or a filename.
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+
+  kind SnapshotKind @default(MANUAL)
+
+  /// Where the archive is. Generated, never derived from the name someone
+  /// typed: a key built from user input is a path built from user input.
+  storageKey String @unique @db.VarChar(255)
+
+  /// Entries in the archive, directories included.
+  fileCount Int
+
+  /// The archive's size, which is not the project's size: it is a tar.
+  sizeBytes Int
+
+  /// SHA-256 of the archive as stored, so what comes back can be checked
+  /// against what went in rather than trusted because it arrived.
+  checksum String @db.Char(64)
+
+  /// Who took it. Nulled rather than cascading, so removing an account does
+  /// not destroy the history of a project other people still work on.
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("SnapshotCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Deployments built from this snapshot. They keep their row when it goes.
+  deployments Deployment[]
+
+  /// Listing one project's snapshots, newest first.
+  @@index([projectId, createdAt])
+  /// Counting and pruning one kind of them, which is a different question from
+  /// listing all of them and is asked on every restore.
+  @@index([projectId, kind, createdAt])
+  @@map("project_snapshots")
+}
+
+/// An environment variable a project needs, which is not a secret.
+///
+/// The counterpart to ProjectSecret, and its opposite. The value here is
+/// stored as text and is meant to be read back: a port number, a log level or
+/// a feature flag is configuration, and configuration nobody can read is
+/// configuration nobody can correct.
+///
+/// A separate table rather than a nullable column on ProjectSecret, because
+/// the two have different rules at every level. This one is readable by an
+/// editor, returned by an endpoint, and shown on a page. Sharing a table would
+/// mean one query away from a mistake that hands out credentials, with a
+/// boolean as the only thing preventing it.
+///
+/// A name may not exist in both tables for one project. The platform refuses
+/// the second rather than choosing a winner, because a precedence rule nobody
+/// can see is how a project ends up running on a value its owner cannot find.
+model ProjectVariable {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  key String @db.VarChar(128)
+
+  /// Plain text, on purpose. This is the whole difference from a secret.
+  value String @db.VarChar(4096)
+
+  /// Who set it last. Kept for audit; nulled rather than cascading so removing
+  /// an account does not delete a project's configuration.
+  updatedById String? @db.Uuid
+  updatedBy   User?   @relation("VariableUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// One value per name per project. Two rows could disagree, and whichever
+  /// the query returned first would decide what the container was given.
+  @@unique([projectId, key])
+  @@map("project_variables")
+}
+
+/// A file belonging to a project that is not part of its source.
+///
+/// The bytes live in object storage; this row is what the platform knows about
+/// them. Kept apart from project_files because the two are opposites: source
+/// files are small, change constantly, and are read and rewritten as text,
+/// while an asset is large, is written once, and is streamed.
+///
+/// The storage key is generated, never derived from the name someone gave the
+/// file. A key built from user input is a path built from user input.
+model ProjectAsset {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Where the bytes are in the object store. Unique across the platform, so
+  /// one project can never address another's.
+  storageKey String @unique @db.VarChar(255)
+
+  /// What to show a person. Never used to address anything.
+  name String @db.VarChar(255)
+
+  /// What the uploader claimed. Recorded and not trusted: assets are served as
+  /// downloads with content sniffing turned off.
+  contentType String @db.VarChar(255)
+
+  size     Int
+  checksum String @db.Char(64)
+
+  /// Nulled rather than cascading, so removing an account does not delete
+  /// files the rest of the project still uses.
+  uploadedById String? @db.Uuid
+  uploadedBy   User?   @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Listing one project's assets, newest first.
+  @@index([projectId, createdAt])
+  @@map("project_assets")
+}
+
+/// Permission for one browser to view one project's preview.
+///
+/// A preview is served from its own hostname, so the platform's session cookie
+/// never reaches it: cookies are scoped by host, and that separation is the
+/// point of the separate host. This is what carries the answer to "may this
+/// browser see this project" across that boundary.
+///
+/// Deliberately shaped like a session: an opaque random token, stored only as
+/// a hash, with an expiry. A dump of this table cannot be replayed.
+model PreviewGrant {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Who it was issued to. Revoking a person's access can then revoke their
+  /// previews, and an audit can say who looked.
+  /// Whose viewing this is. Null for somebody who came in through a share link
+  /// and has no account here.
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The share link this viewing came from, when it came from one.
+  ///
+  /// Checked on every request rather than only on the way in, so revoking a
+  /// link cuts off people already looking — not just people who have not
+  /// opened it yet.
+  shareId String?       @db.Uuid
+  share   PreviewShare? @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the token. Never the token itself.
+  tokenHash String @unique @db.Char(64)
+
+  /// Short. A preview grant is exchanged for a cookie within seconds of being
+  /// issued, so a long life would only widen the window for a leaked URL.
+  expiresAt DateTime @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Expired-grant cleanup, and revoking every grant for one project.
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("preview_grants")
+}
+
+/// A link that lets anybody view a project's preview, without an account.
+///
+/// Creating one is a decision to show a project's running code to people who
+/// have agreed to nothing here — the same decision as deploying — so it takes
+/// the same permission. Time-limited always; revocable at any moment.
+model PreviewShare {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Who made it. Nulled rather than cascading, so the list still reads after
+  /// the account is gone.
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("PreviewShareCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// A hash of the link's token, never the token. Shown once, when made.
+  tokenHash String @unique @db.Char(64)
+
+  /// Something to recognise it by in a list: "for the client demo".
+  label String? @db.VarChar(100)
+
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  grants PreviewGrant[]
+
+  @@index([projectId, createdAt])
+  @@map("preview_shares")
+}
+
+/// One recorded change of runtime status.
+///
+/// Append-only. The runtime row says where things stand; this says how they
+/// got there, which is what makes a failure diagnosable after the fact and
+/// what a later monitoring surface can report without inventing numbers.
+model RuntimeEvent {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  runtimeId String  @db.Uuid
+  runtime   Runtime @relation(fields: [runtimeId], references: [id], onDelete: Cascade)
+
+  /// Null for the first event, when the runtime had no previous status.
+  fromStatus RuntimeStatus?
+  toStatus   RuntimeStatus
+
+  /// Why the transition happened. Safe to show a user.
+  reason String? @db.VarChar(500)
+
+  /// Who caused it, where a person did. Null for platform-initiated changes.
+  actorId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Reading one runtime's history in order.
+  @@index([runtimeId, createdAt])
+  @@map("runtime_events")
+}
+
+/// Whether and when to tell a project's owner that its deployment is in trouble,
+/// and where each alert stands.
+///
+/// Settings and state in one row: the state is only meaningful against the
+/// settings it was computed under, and changing a threshold resets it.
+model ProjectAlertSettings {
+  projectId String  @id @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  enabled             Boolean @default(false)
+  failuresBeforeAlert Int     @default(3)
+  /// Null leaves memory unwatched.
+  memoryPercent       Int?
+
+  /// Health checks failed in a row, reset by one that passes.
+  consecutiveFailures Int     @default(0)
+  healthFiring        Boolean @default(false)
+  memoryFiring        Boolean @default(false)
+
+  /// When a worker last looked. Also what stops two workers looking at once.
+  lastCheckedAt DateTime? @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// Finding what is due for a check.
+  @@index([enabled, lastCheckedAt])
+  @@map("project_alert_settings")
+}
+
+/// An alert starting or clearing. Kept so the page can say what happened
+/// overnight, and whether anybody was told.
+model ProjectAlertEvent {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  kind     String  @db.VarChar(16)
+  state    String  @db.VarChar(16)
+  message  String  @db.VarChar(500)
+  notified Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, createdAt])
+  @@map("project_alert_events")
+}
+
+/// Where a project's history is pushed to and pulled from. One per project.
+///
+/// The token is sealed with the secrets key and never returned by any endpoint;
+/// the URL may not carry credentials, so it is safe to show.
+model ProjectGitRemote {
+  projectId String  @id @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  url      String  @db.VarChar(500)
+  username String? @db.VarChar(200)
+  token    Bytes?
+
+  lastPushedAt DateTime? @db.Timestamptz(3)
+  lastPulledAt DateTime? @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_git_remotes")
+}
+
+/// An execution host an operator has taken out of placement.
+///
+/// Nothing new is placed on a drained host; what is already there keeps running
+/// and moves off as it is restarted. A row rather than a configuration change,
+/// so draining a machine for maintenance does not mean redeploying the control
+/// plane.
+model ExecutionHostDrain {
+  hostName  String   @id @db.VarChar(32)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("execution_host_drains")
+}

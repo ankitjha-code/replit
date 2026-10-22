@@ -1,0 +1,77 @@
+@layer feature {
+  .members__person {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .members__names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .members__name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: var(--weight-medium);
+  }
+
+  /* A long name scrolls the table rather than breaking into one letter per line. */
+  .members__name-text,
+  .members__username {
+    max-width: 28ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .members__username {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .members__invite {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .members__invite-title {
+    margin: 0;
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  .members__invite-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    max-width: var(--width-prose);
+  }
+
+  .members__invite-actions,
+  .members__leave {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  @media (max-width: 719px) {
+    .members__invite-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .members__invite-actions > *,
+    .members__leave > * {
+      flex: 1 1 100%;
+    }
+  }
+}

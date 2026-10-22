@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // page.evaluate callbacks run inside the browser, so specs legitimately
+    // reference DOM globals even though the runner itself is Node.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

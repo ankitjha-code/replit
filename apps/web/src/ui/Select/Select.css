@@ -1,0 +1,92 @@
+@layer ui {
+  .ui-select-wrap {
+    position: relative;
+    display: inline-flex;
+    width: 100%;
+    min-width: 0;
+    height: var(--control-h-lg);
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-2);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    transition: border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .ui-select-wrap--sm {
+    height: var(--control-h-sm);
+    border-radius: var(--radius-1);
+    font-size: var(--text-xs);
+  }
+
+  .ui-select-wrap--md {
+    height: var(--control-h-md);
+    border-radius: var(--radius-1);
+    font-size: var(--text-sm);
+  }
+
+  .ui-select-wrap--invalid {
+    border-color: var(--danger);
+  }
+
+  .ui-select-wrap--disabled {
+    border-style: dashed;
+    color: var(--text-disabled);
+  }
+
+  .ui-select-wrap:focus-within {
+    border-color: var(--border-strong);
+    box-shadow:
+      0 0 0 2px var(--bg-base),
+      0 0 0 4px var(--focus);
+  }
+
+  .ui-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 var(--space-8) 0 var(--space-3);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .ui-select-wrap--sm .ui-select,
+  .ui-select-wrap--md .ui-select {
+    padding-left: var(--space-2);
+    padding-right: var(--space-6);
+  }
+
+  .ui-select:disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Options open in a native list, which follows color-scheme, not these tokens. */
+  .ui-select option {
+    color: initial;
+  }
+
+  .ui-select__caret {
+    position: absolute;
+    top: 0;
+    right: var(--space-2);
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  @media (max-width: 767px) {
+    .ui-select-wrap {
+      height: var(--control-h-touch);
+    }
+  }
+}

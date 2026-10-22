@@ -1,0 +1,49 @@
+{
+  "name": "replit-clone",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A cloud development platform: browser IDE, isolated execution, previews and deployments.",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build && pnpm -r --filter \"./apps/**\" build",
+    "dev": "pnpm -r --parallel --filter \"./apps/**\" dev",
+    "dev:api": "pnpm --filter @platform/api dev",
+    "dev:web": "pnpm --filter @platform/web dev",
+    "dev:worker": "pnpm --filter @platform/api worker",
+    "infra:up": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml up -d --wait && docker compose --env-file .env -f infra/docker-compose.yml run --rm --no-deps -T minio-init",
+    "infra:down": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml --profile queue --profile init down --remove-orphans",
+    "infra:reset": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml --profile queue --profile init down -v --remove-orphans",
+    "infra:logs": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml logs -f",
+    "infra:ps": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml --profile queue --profile init ps",
+    "infra:config": "node scripts/ensure-env.mjs && docker compose --env-file .env -f infra/docker-compose.yml config",
+    "db:generate": "pnpm --filter @platform/api db:generate",
+    "db:migrate": "pnpm --filter @platform/api db:migrate",
+    "db:deploy": "pnpm --filter @platform/api db:deploy",
+    "db:status": "pnpm --filter @platform/api db:status",
+    "db:reset": "pnpm --filter @platform/api db:reset",
+    "db:studio": "pnpm --filter @platform/api db:studio",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --workspace-concurrency=1 --filter \"./packages/**\" --filter \"./apps/**\" test",
+    "test:e2e": "pnpm build && pnpm --filter @platform/e2e test",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo *.tsbuildinfo && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2"
+  }
+}

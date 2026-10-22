@@ -1,0 +1,350 @@
+/*
+ * Design tokens. The only file where a raw colour, radius, shadow, z-index or
+ * duration appears (styles/tokens.test.ts enforces that and re-checks every
+ * contrast pair in the design spec's Appendix A against these values).
+ *
+ * Dark is the default on :root. Light is applied twice, once for the system
+ * preference and once for an explicit choice, so the OS wins unless the user
+ * picked a theme (theme/theme.ts sets data-theme). The two light blocks must
+ * stay identical; the test compares them.
+ */
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    /* --- surfaces --------------------------------------------------------- */
+    --bg-canvas: #0f1114;
+    --bg-base: #141619;
+    --bg-raised: #1a1d21;
+    --bg-overlay: #22262b;
+    --bg-input: #0f1114;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-active: rgba(255, 255, 255, 0.09);
+    --bg-selected: rgba(255, 138, 61, 0.14);
+
+    /* --- edges ------------------------------------------------------------ */
+    --border-subtle: #262a2f;
+    --border-strong: #363b42;
+    --border-input: #6c757f;
+
+    /* --- text ------------------------------------------------------------- */
+    --text-primary: #e6e9ed;
+    --text-secondary: #a9b1bb;
+    --text-muted: #8d959f;
+    --text-disabled: #6a737e;
+
+    /* --- accent: the single primary action, links, active indicator ------- */
+    --accent: #ff8a3d;
+    --accent-hover: #ff9d5c;
+    --on-accent: #1a1004;
+    --accent-text: #ffa15e;
+
+    /* --- semantics -------------------------------------------------------- */
+    --ok: #5be894;
+    --ok-bg: #12301d;
+    --warn: #f5b942;
+    --warn-bg: #332a10;
+    --danger: #ff7a76;
+    --danger-bg: #3a1a1a;
+    --danger-fill: #cf3232;
+    --danger-fill-hover: #b82a2a;
+    --on-danger: #ffffff;
+    --info: #7cc4ff;
+    --info-bg: #122b40;
+
+    /* --- focus and selection ---------------------------------------------- */
+    --focus: #7cc4ff;
+    --selection: #1a2e4a;
+    --line-highlight: #16191d;
+
+    /* --- presence (stable per user, hash of the user id) ------------------ */
+    --presence-1: #7cc4ff;
+    --presence-2: #5be894;
+    --presence-3: #f5b942;
+    --presence-4: #ff8a3d;
+    --presence-5: #d89bff;
+    --presence-6: #5fd3d0;
+    --presence-7: #ff7a76;
+    --presence-8: #c9d1d9;
+    --on-presence: #15181c;
+
+    --overlay-scrim: rgba(0, 0, 0, 0.55);
+
+    /* --- code and terminal ------------------------------------------------ */
+    --code-keyword: #ff9d5c;
+    --code-string: #8fd6a8;
+    --code-number: #f2c46d;
+    --code-comment: #8d959f;
+    --code-type: #7cc4ff;
+    --code-function: #e8c98a;
+    --code-variable: #e6e9ed;
+    --code-punctuation: #a9b1bb;
+
+    --ansi-black: #3a4047;
+    --ansi-bright-black: #8d959f;
+    --ansi-red: #ff7a76;
+    --ansi-green: #5be894;
+    --ansi-yellow: #f5b942;
+    --ansi-blue: #7cc4ff;
+    --ansi-magenta: #d89bff;
+    --ansi-cyan: #5fd3d0;
+    --ansi-white: #e6e9ed;
+
+    /* --- shadow (menus and popovers: 2; dialogs, palette, toasts: 3) ------ */
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-subtle);
+    --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border-strong);
+
+    /* --- spacing: a 4px scale ------------------------------------------------ */
+    --space-0: 0;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    --gutter: 16px;
+    --width-page: 960px;
+    --width-form: min(420px, 100% - 2 * var(--gutter));
+    --width-prose: 640px;
+
+    /* --- radius ------------------------------------------------------------- */
+    --radius-1: 4px;
+    --radius-2: 6px;
+    --radius-3: 8px;
+    --radius-4: 12px;
+    --radius-full: 999px;
+
+    /* --- control heights ---------------------------------------------------- */
+    --control-h-sm: 24px;
+    --control-h-md: 28px;
+    --control-h-lg: 32px;
+    --control-h-touch: 40px;
+
+    /* --- type: size, line height, weight and tracking per role -------------- */
+    --font-ui:
+      'Geist Variable', 'Geist Fallback', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica,
+      Arial, sans-serif;
+    --font-mono:
+      'JetBrains Mono Variable', 'JetBrains Mono Fallback', ui-monospace, 'SF Mono', Menlo,
+      Consolas, 'Liberation Mono', monospace;
+
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+
+    --text-2xs: 11px;
+    --leading-2xs: 16px;
+    --text-xs: 12px;
+    --leading-xs: 16px;
+    --text-sm: 13px;
+    --leading-sm: 20px;
+    --text-md: 14px;
+    --leading-md: 20px;
+    --text-lg: 16px;
+    --leading-lg: 24px;
+    --text-xl: 20px;
+    --leading-xl: 28px;
+    --text-2xl: 24px;
+    --leading-2xl: 32px;
+    --mono-xs: 12px;
+    --leading-mono-xs: 18px;
+    --mono-sm: 13px;
+    --leading-mono-sm: 20px;
+    --tracking-caps: 0.06em;
+    --tracking-tight: -0.01em;
+
+    /* --- z-index ------------------------------------------------------------ */
+    --z-base: 0;
+    --z-sticky: 10;
+    --z-rail: 20;
+    --z-banner: 30;
+    --z-popover: 40;
+    --z-dialog: 50;
+    --z-toast: 60;
+    --z-tooltip: 70;
+    --z-skiplink: 80;
+
+    /* --- motion ------------------------------------------------------------- */
+    --duration-fast: 80ms;
+    --duration-base: 140ms;
+    --duration-slow: 220ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --gutter: 24px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --gutter: 32px;
+      --text-2xl: 28px;
+    }
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme='dark']) {
+      color-scheme: light;
+
+      --bg-canvas: #fbfcfd;
+      --bg-base: #f1f3f5;
+      --bg-raised: #f9fafb;
+      --bg-overlay: #fdfdfe;
+      --bg-input: #fbfcfd;
+      --bg-hover: rgba(16, 20, 26, 0.05);
+      --bg-active: rgba(16, 20, 26, 0.09);
+      --bg-selected: rgba(194, 65, 12, 0.1);
+
+      --border-subtle: #e0e4e9;
+      --border-strong: #c2c8d0;
+      --border-input: #7c8591;
+
+      --text-primary: #15181c;
+      --text-secondary: #454d57;
+      --text-muted: #5a636f;
+      --text-disabled: #838b95;
+
+      --accent: #c2410c;
+      --accent-hover: #a8360a;
+      --on-accent: #ffffff;
+      --accent-text: #b03a08;
+
+      --ok: #116b33;
+      --ok-bg: #e3f5e9;
+      --warn: #7d5300;
+      --warn-bg: #fff1c9;
+      --danger: #c62828;
+      --danger-bg: #fdeaea;
+      --danger-fill: #c62828;
+      --danger-fill-hover: #a52020;
+      --on-danger: #ffffff;
+      --info: #0b63c4;
+      --info-bg: #e6f0fb;
+
+      --focus: #0b63c4;
+      --selection: #dcecff;
+      --line-highlight: #f3f5f7;
+
+      --presence-1: #0969da;
+      --presence-2: #1a7f37;
+      --presence-3: #7d5a00;
+      --presence-4: #953800;
+      --presence-5: #6639ba;
+      --presence-6: #0e6b73;
+      --presence-7: #a40e26;
+      --presence-8: #57606a;
+      --on-presence: #ffffff;
+
+      --overlay-scrim: rgba(21, 24, 28, 0.35);
+
+      --code-keyword: #b4470a;
+      --code-string: #176b43;
+      --code-number: #7a5200;
+      --code-comment: #5a636f;
+      --code-type: #1f5fa8;
+      --code-function: #6b4a00;
+      --code-variable: #15181c;
+      --code-punctuation: #454d57;
+
+      --ansi-black: #15181c;
+      --ansi-bright-black: #5a636f;
+      --ansi-red: #c22f2b;
+      --ansi-green: #176b43;
+      --ansi-yellow: #7a5200;
+      --ansi-blue: #1f5fa8;
+      --ansi-magenta: #8a3fb8;
+      --ansi-cyan: #0b6e6c;
+      --ansi-white: #454d57;
+
+      --shadow-1: 0 1px 2px rgba(16, 20, 26, 0.08);
+      --shadow-2: 0 4px 12px rgba(16, 20, 26, 0.12), 0 0 0 1px var(--border-subtle);
+      --shadow-3: 0 16px 40px rgba(16, 20, 26, 0.18), 0 0 0 1px var(--border-strong);
+    }
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --bg-canvas: #fbfcfd;
+    --bg-base: #f1f3f5;
+    --bg-raised: #f9fafb;
+    --bg-overlay: #fdfdfe;
+    --bg-input: #fbfcfd;
+    --bg-hover: rgba(16, 20, 26, 0.05);
+    --bg-active: rgba(16, 20, 26, 0.09);
+    --bg-selected: rgba(194, 65, 12, 0.1);
+
+    --border-subtle: #e0e4e9;
+    --border-strong: #c2c8d0;
+    --border-input: #7c8591;
+
+    --text-primary: #15181c;
+    --text-secondary: #454d57;
+    --text-muted: #5a636f;
+    --text-disabled: #838b95;
+
+    --accent: #c2410c;
+    --accent-hover: #a8360a;
+    --on-accent: #ffffff;
+    --accent-text: #b03a08;
+
+    --ok: #116b33;
+    --ok-bg: #e3f5e9;
+    --warn: #7d5300;
+    --warn-bg: #fff1c9;
+    --danger: #c62828;
+    --danger-bg: #fdeaea;
+    --danger-fill: #c62828;
+    --danger-fill-hover: #a52020;
+    --on-danger: #ffffff;
+    --info: #0b63c4;
+    --info-bg: #e6f0fb;
+
+    --focus: #0b63c4;
+    --selection: #dcecff;
+    --line-highlight: #f3f5f7;
+
+    --presence-1: #0969da;
+    --presence-2: #1a7f37;
+    --presence-3: #7d5a00;
+    --presence-4: #953800;
+    --presence-5: #6639ba;
+    --presence-6: #0e6b73;
+    --presence-7: #a40e26;
+    --presence-8: #57606a;
+    --on-presence: #ffffff;
+
+    --overlay-scrim: rgba(21, 24, 28, 0.35);
+
+    --code-keyword: #b4470a;
+    --code-string: #176b43;
+    --code-number: #7a5200;
+    --code-comment: #5a636f;
+    --code-type: #1f5fa8;
+    --code-function: #6b4a00;
+    --code-variable: #15181c;
+    --code-punctuation: #454d57;
+
+    --ansi-black: #15181c;
+    --ansi-bright-black: #5a636f;
+    --ansi-red: #c22f2b;
+    --ansi-green: #176b43;
+    --ansi-yellow: #7a5200;
+    --ansi-blue: #1f5fa8;
+    --ansi-magenta: #8a3fb8;
+    --ansi-cyan: #0b6e6c;
+    --ansi-white: #454d57;
+
+    --shadow-1: 0 1px 2px rgba(16, 20, 26, 0.08);
+    --shadow-2: 0 4px 12px rgba(16, 20, 26, 0.12), 0 0 0 1px var(--border-subtle);
+    --shadow-3: 0 16px 40px rgba(16, 20, 26, 0.18), 0 0 0 1px var(--border-strong);
+  }
+}

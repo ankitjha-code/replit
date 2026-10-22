@@ -1,0 +1,34 @@
+@layer ui {
+  .ui-code-block {
+    position: relative;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2);
+    background: var(--bg-canvas);
+  }
+
+  .ui-code-block__pre {
+    margin: 0;
+    padding: var(--space-3);
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: var(--mono-xs);
+    line-height: var(--leading-mono-xs);
+    color: var(--text-primary);
+    tab-size: 2;
+  }
+
+  .ui-code-block--wrap .ui-code-block__pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ui-code-block:has(.ui-code-block__copy) .ui-code-block__pre {
+    padding-right: var(--space-10);
+  }
+
+  .ui-code-block__copy {
+    position: absolute;
+    top: var(--space-1);
+    right: var(--space-1);
+  }
+}

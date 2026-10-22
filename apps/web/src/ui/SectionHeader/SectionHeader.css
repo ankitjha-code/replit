@@ -1,0 +1,76 @@
+@layer ui {
+  /*
+   * The action wraps under the title when the text would otherwise be
+   * squeezed below ~20rem, which is what a phone or a narrow column gives it;
+   * no breakpoint, so it also holds inside a settings page beside its sidebar.
+   */
+  .ui-section-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+    scroll-margin-top: var(--space-16);
+  }
+
+  .ui-section-header__text {
+    display: flex;
+    /* The width, not flex-basis, carries the 20rem: a consumer that stacks the
+       header as a column would otherwise turn it into a 20rem tall gap. */
+    flex: 1 1 auto;
+    width: 20rem;
+    max-width: 100%;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .ui-section-header__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: var(--leading-lg);
+    font-weight: var(--weight-semibold);
+  }
+
+  .ui-section-header__count {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ui-section-header__description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .ui-section-header__help {
+    color: var(--text-secondary);
+  }
+
+  .ui-section-header__help p {
+    margin: 0 0 var(--space-2);
+  }
+
+  .ui-section-header__help p:last-child {
+    margin-bottom: 0;
+  }
+
+  .ui-section-header__action {
+    flex: none;
+    max-width: 100%;
+  }
+
+  /* A table or list right under a header shares its rule. */
+  .ui-section-header + .ui-table-wrap .ui-table tbody tr:first-child td,
+  .ui-section-header + .ui-list-row {
+    border-top: 0;
+  }
+}
