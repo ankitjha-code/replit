@@ -1,0 +1,120 @@
+@layer tokens, base, ui, feature;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: var(--leading-md);
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme='dark']) body {
+      -webkit-font-smoothing: auto;
+    }
+  }
+
+  :root[data-theme='light'] body {
+    -webkit-font-smoothing: auto;
+  }
+
+  a {
+    color: var(--accent-text);
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--bg-base),
+      0 0 0 4px var(--focus);
+  }
+
+  ::selection {
+    background: var(--selection);
+    color: var(--text-primary);
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  #overlays {
+    position: relative;
+    z-index: var(--z-popover);
+  }
+
+  [data-ui-portal='popover'] {
+    z-index: var(--z-popover);
+  }
+  [data-ui-portal='dialog'] {
+    z-index: var(--z-dialog);
+  }
+  [data-ui-portal='toast'] {
+    z-index: var(--z-toast);
+  }
+  [data-ui-portal='tooltip'] {
+    z-index: var(--z-tooltip);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --duration-fast: 1ms;
+      --duration-base: 1ms;
+      --duration-slow: 1ms;
+    }
+    .ui-spinner {
+      animation: none;
+    }
+    .ui-env-dot--starting {
+      animation: none;
+    }
+    .ui-skeleton {
+      animation: none;
+    }
+    .ui-guide-flash {
+      animation: none;
+      outline: 2px solid var(--focus);
+    }
+  }
+
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid CanvasText;
+      outline-offset: 2px;
+      box-shadow: none;
+    }
+    ::selection {
+      background: Highlight;
+      color: HighlightText;
+    }
+  }
+}

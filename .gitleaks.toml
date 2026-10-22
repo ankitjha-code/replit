@@ -1,0 +1,17 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets"
+regexes = [
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+  '''a-long-smoke-passphrase-1''',
+  '''a-long-production-passphrase-1''',
+  '''a-long-load-test-passphrase-1''',
+]
+paths = [
+  '''(^|/)\.env$''',
+  '''deploy/.*\.local\.env$''',
+  '''deploy/production\.env$''',
+  '''deploy/api\.env$''',
+]

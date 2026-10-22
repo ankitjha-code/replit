@@ -1,0 +1,928 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  email String @unique @db.VarChar(320)
+
+  username String @unique @db.VarChar(39)
+
+  passwordHash String @db.Text
+
+  displayName String? @db.VarChar(100)
+
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+
+  isOperator Boolean @default(false)
+
+  totpSecret    Bytes?
+  totpEnabledAt DateTime? @db.Timestamptz(3)
+
+  totpLastStep Int?
+
+  recoveryCodes TotpRecoveryCode[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  sessions             Session[]
+  tokens               AccountToken[]
+  memberships          ProjectMember[]
+  ownedProjects        Project[]                @relation("ProjectOwner")
+  requestedRuntimes    Runtime[]                @relation("RuntimeRequestedBy")
+  previewGrants        PreviewGrant[]
+  uploadedAssets       ProjectAsset[]           @relation("AssetUploadedBy")
+  createdSnapshots     ProjectSnapshot[]        @relation("SnapshotCreatedBy")
+  requestedDeployments Deployment[]             @relation("DeploymentRequestedBy")
+  updatedSecrets       ProjectSecret[]          @relation("SecretUpdatedBy")
+  createdBackups       ProjectDatabaseBackup[]  @relation("BackupCreatedBy")
+  terminals            ProjectTerminalSession[] @relation("TerminalOwner")
+  operatorActions      OperatorAuditEntry[]     @relation("AuditActor")
+  previewShares        PreviewShare[]           @relation("PreviewShareCreatedBy")
+  updatedVariables     ProjectVariable[]        @relation("VariableUpdatedBy")
+  quotaOverrides       AccountQuotaOverride[]   @relation("QuotaOverrides")
+
+  @@map("users")
+}
+
+model Session {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @db.Char(64)
+
+  expiresAt DateTime @db.Timestamptz(3)
+
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+
+  userAgent String? @db.VarChar(256)
+  ipAddress String? @db.Inet
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model AccountQuotaOverride {
+  userId String @db.Uuid
+  user   User   @relation("QuotaOverrides", fields: [userId], references: [id], onDelete: Cascade)
+
+  kind String @db.VarChar(32)
+
+  limit Int
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([userId, kind])
+  @@map("account_quota_overrides")
+}
+
+model OperatorAuditEntry {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  actorId String? @db.Uuid
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  actorName String @db.VarChar(39)
+
+  action String @db.VarChar(64)
+
+  targetId   String? @db.Uuid
+  targetName String? @db.VarChar(39)
+
+  detail Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@map("operator_audit_entries")
+}
+
+model TotpRecoveryCode {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash String    @unique @db.Char(64)
+  usedAt   DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("totp_recovery_codes")
+}
+
+enum AccountTokenKind {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  LOGIN_CHALLENGE
+
+  @@map("account_token_kind")
+}
+
+model AccountToken {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind AccountTokenKind
+
+  tokenHash String @unique @db.Char(64)
+
+  email String @db.VarChar(320)
+
+  expiresAt DateTime @db.Timestamptz(3)
+
+  usedAt DateTime? @db.Timestamptz(3)
+
+  attempts Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, kind])
+  @@index([expiresAt])
+  @@map("account_tokens")
+}
+
+enum ProjectRole {
+  VIEWER
+  EDITOR
+  OWNER
+
+  @@map("project_role")
+}
+
+model Project {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  slug String @db.VarChar(63)
+
+  name String @db.VarChar(100)
+
+  description String? @db.VarChar(500)
+
+  runCommand String? @db.VarChar(2000)
+
+  ownerId String @db.Uuid
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members          ProjectMember[]
+  files            ProjectFile[]
+  databaseBackups  ProjectDatabaseBackup[]
+  terminalSessions ProjectTerminalSession[]
+  previewShares    PreviewShare[]
+
+  runtime Runtime?
+
+  previewGrants PreviewGrant[]
+  assets        ProjectAsset[]
+  secrets       ProjectSecret[]
+  variables     ProjectVariable[]
+
+  database  ProjectDatabase?
+  snapshots ProjectSnapshot[]
+
+  repository ProjectRepository?
+
+  deployments      Deployment[]
+  deploymentConfig ProjectDeploymentConfig?
+  domains          ProjectDomain[]
+  logLines         ProjectLogLine[]
+  jobs             Job[]
+
+  healthCheckPath      String? @db.VarChar(200)
+  healthCheckTimeoutMs Int?
+
+  deploymentSubdomain String? @unique @db.VarChar(63)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  alertSettings ProjectAlertSettings?
+  gitRemote     ProjectGitRemote?
+  alertEvents   ProjectAlertEvent[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, createdAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role ProjectRole
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+enum ProjectFileType {
+  FILE
+  DIRECTORY
+
+  @@map("project_file_type")
+}
+
+model ProjectFile {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  path String @db.VarChar(1024)
+
+  parentPath String @db.VarChar(1024)
+
+  name String @db.VarChar(255)
+
+  type ProjectFileType
+
+  content Bytes?
+
+  size Int @default(0)
+
+  checksum String? @db.Char(64)
+
+  isBinary Boolean @default(false)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, path])
+  @@index([projectId, parentPath])
+  @@index([projectId, path])
+  @@map("project_files")
+}
+
+enum RunStatus {
+  IDLE
+  STARTING
+  RUNNING
+  EXITED
+  FAILED
+
+  @@map("run_status")
+}
+
+enum RuntimeStatus {
+  REQUESTED
+  CREATING
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+
+  @@map("runtime_status")
+}
+
+model Runtime {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status RuntimeStatus @default(REQUESTED)
+
+  provider String @db.VarChar(32)
+
+  externalId String? @db.VarChar(128)
+
+  executionHost String? @db.VarChar(32)
+
+  language String @db.VarChar(32)
+  version  String @db.VarChar(32)
+  image    String @db.VarChar(200)
+
+  cpuMillicores Int
+  memoryMb      Int
+  pidsLimit     Int
+
+  runStatus    RunStatus @default(IDLE)
+  runCommand   String?   @db.VarChar(2000)
+  runStartedAt DateTime? @db.Timestamptz(3)
+  runExitedAt  DateTime? @db.Timestamptz(3)
+  runExitCode  Int?
+  runMessage   String?   @db.VarChar(500)
+
+  previewPort Int?
+
+  message String? @db.VarChar(500)
+
+  revision Int @default(0)
+
+  requestedById String? @db.Uuid
+  requestedBy   User?   @relation("RuntimeRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  statusChangedAt DateTime  @default(now()) @db.Timestamptz(3)
+  startedAt       DateTime? @db.Timestamptz(3)
+  stoppedAt       DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  events    RuntimeEvent[]
+  terminals ProjectTerminalSession[]
+
+  @@index([status])
+  @@map("runtimes")
+}
+
+model ProjectSecret {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  key String @db.VarChar(128)
+
+  value Bytes
+
+  length Int
+
+  updatedById String? @db.Uuid
+  updatedBy   User?   @relation("SecretUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, key])
+  @@map("project_secrets")
+}
+
+enum DatabaseStatus {
+  CREATING
+  READY
+  FAILED
+
+  @@map("database_status")
+}
+
+model ProjectDatabase {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status DatabaseStatus @default(CREATING)
+
+  name String @unique @db.VarChar(63)
+
+  role String @unique @db.VarChar(63)
+
+  password Bytes
+
+  message String? @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  backups ProjectDatabaseBackup[]
+
+  @@map("project_databases")
+}
+
+enum BackupStatus {
+  RUNNING
+  READY
+  FAILED
+
+  @@map("backup_status")
+}
+
+model ProjectDatabaseBackup {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  databaseId String          @db.Uuid
+  database   ProjectDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status BackupStatus @default(RUNNING)
+
+  note String? @db.VarChar(200)
+
+  storageKey String? @unique @db.VarChar(255)
+  sizeBytes  Int?
+
+  message String? @db.VarChar(500)
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("BackupCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+
+  @@index([projectId, createdAt])
+  @@map("project_database_backups")
+}
+
+model ProjectTerminalSession {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation("TerminalOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  runtimeId String  @db.Uuid
+  runtime   Runtime @relation(fields: [runtimeId], references: [id], onDelete: Cascade)
+
+  durable Boolean @default(true)
+
+  rows    Int
+  columns Int
+
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  lastActiveAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, userId])
+  @@map("project_terminal_sessions")
+}
+
+model ProjectRepository {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storageKey String @unique @db.VarChar(255)
+
+  branch String @default("main") @db.VarChar(255)
+
+  headOid String? @db.Char(40)
+
+  checksum String @db.Char(64)
+
+  sizeBytes Int @default(0)
+
+  commitCount Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_repositories")
+}
+
+enum DeploymentStatus {
+  REQUESTED
+  BUILDING
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+
+  @@map("deployment_status")
+}
+
+enum DeploymentTarget {
+  STATIC
+  SERVER
+
+  @@map("deployment_target")
+}
+
+model Deployment {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status DeploymentStatus @default(REQUESTED)
+
+  releaseLabel String? @unique @db.VarChar(32)
+
+  rolledBackFromId String?          @db.Uuid
+  rolledBackFrom   Deployment?      @relation("DeploymentRollback", fields: [rolledBackFromId], references: [id], onDelete: SetNull)
+  rollbacks        Deployment[]     @relation("DeploymentRollback")
+  target           DeploymentTarget
+
+  note String? @db.VarChar(200)
+
+  buildCommand    String? @db.VarChar(2000)
+  outputDirectory String? @db.VarChar(200)
+  startCommand    String? @db.VarChar(2000)
+
+  snapshotId String?          @db.Uuid
+  snapshot   ProjectSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  provider   String? @db.VarChar(32)
+  externalId String? @db.VarChar(128)
+
+  executionHost String? @db.VarChar(32)
+
+  url String? @db.VarChar(500)
+
+  containerPort Int?
+
+  buildLog          String? @db.Text
+  buildLogTruncated Boolean @default(false)
+
+  artifactKey   String? @unique @db.VarChar(255)
+  artifactBytes Int?
+  fileCount     Int?
+
+  message String? @db.VarChar(500)
+
+  revision Int @default(0)
+
+  requestedById String? @db.Uuid
+  requestedBy   User?   @relation("DeploymentRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  statusChangedAt DateTime  @default(now()) @db.Timestamptz(3)
+  startedAt       DateTime? @db.Timestamptz(3)
+  stoppedAt       DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  events DeploymentEvent[]
+
+  @@index([projectId, createdAt])
+  @@index([status])
+  @@map("deployments")
+}
+
+model DeploymentEvent {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  deploymentId String     @db.Uuid
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  fromStatus DeploymentStatus?
+  toStatus   DeploymentStatus
+
+  reason String? @db.VarChar(500)
+
+  actorId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([deploymentId, createdAt])
+  @@map("deployment_events")
+}
+
+model ProjectDeploymentConfig {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @unique @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  target DeploymentTarget
+
+  buildCommand    String? @db.VarChar(2000)
+  outputDirectory String? @db.VarChar(200)
+  startCommand    String? @db.VarChar(2000)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_deployment_configs")
+}
+
+enum JobType {
+  RUNTIME_START
+  DEPLOYMENT_BUILD
+
+  @@map("job_type")
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+
+  @@map("job_status")
+}
+
+model Job {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String?  @db.Uuid
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type   JobType
+  status JobStatus @default(QUEUED)
+
+  payload Json
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  priority Int @default(0)
+
+  lastError String? @db.VarChar(1000)
+
+  scheduledAt DateTime @default(now()) @db.Timestamptz(3)
+
+  startedAt  DateTime? @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+
+  lockedBy String?   @db.VarChar(64)
+  lockedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status, priority(sort: Desc), scheduledAt])
+  @@index([projectId, createdAt])
+  @@map("jobs")
+}
+
+enum DomainStatus {
+  PENDING
+  VERIFIED
+  FAILED
+
+  @@map("domain_status")
+}
+
+model ProjectDomain {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  hostname String @unique @db.VarChar(253)
+
+  status DomainStatus @default(PENDING)
+
+  verificationToken String @db.VarChar(64)
+
+  message String? @db.VarChar(500)
+
+  verifiedAt    DateTime? @db.Timestamptz(3)
+  lastCheckedAt DateTime? @db.Timestamptz(3)
+
+  consecutiveMisses Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId, createdAt])
+  @@index([status, lastCheckedAt])
+  @@map("project_domains")
+}
+
+enum LogSource {
+  RUN
+  DEPLOYMENT
+
+  @@map("log_source")
+}
+
+model ProjectLogLine {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  source   LogSource
+  sourceId String    @db.VarChar(64)
+
+  stream String @db.VarChar(8)
+
+  message String @db.VarChar(2000)
+
+  at DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, at, id])
+  @@index([projectId, source, sourceId, at])
+  @@map("project_log_lines")
+}
+
+enum SnapshotKind {
+  MANUAL
+  AUTOMATIC
+  DEPLOYMENT
+}
+
+model ProjectSnapshot {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+
+  kind SnapshotKind @default(MANUAL)
+
+  storageKey String @unique @db.VarChar(255)
+
+  fileCount Int
+
+  sizeBytes Int
+
+  checksum String @db.Char(64)
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("SnapshotCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  deployments Deployment[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, kind, createdAt])
+  @@map("project_snapshots")
+}
+
+model ProjectVariable {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  key String @db.VarChar(128)
+
+  value String @db.VarChar(4096)
+
+  updatedById String? @db.Uuid
+  updatedBy   User?   @relation("VariableUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, key])
+  @@map("project_variables")
+}
+
+model ProjectAsset {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  storageKey String @unique @db.VarChar(255)
+
+  name String @db.VarChar(255)
+
+  contentType String @db.VarChar(255)
+
+  size     Int
+  checksum String @db.Char(64)
+
+  uploadedById String? @db.Uuid
+  uploadedBy   User?   @relation("AssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, createdAt])
+  @@map("project_assets")
+}
+
+model PreviewGrant {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shareId String?       @db.Uuid
+  share   PreviewShare? @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @db.Char(64)
+
+  expiresAt DateTime @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("preview_grants")
+}
+
+model PreviewShare {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("PreviewShareCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  tokenHash String @unique @db.Char(64)
+
+  label String? @db.VarChar(100)
+
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  grants PreviewGrant[]
+
+  @@index([projectId, createdAt])
+  @@map("preview_shares")
+}
+
+model RuntimeEvent {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  runtimeId String  @db.Uuid
+  runtime   Runtime @relation(fields: [runtimeId], references: [id], onDelete: Cascade)
+
+  fromStatus RuntimeStatus?
+  toStatus   RuntimeStatus
+
+  reason String? @db.VarChar(500)
+
+  actorId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([runtimeId, createdAt])
+  @@map("runtime_events")
+}
+
+model ProjectAlertSettings {
+  projectId String  @id @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  enabled             Boolean @default(false)
+  failuresBeforeAlert Int     @default(3)
+  memoryPercent       Int?
+
+  consecutiveFailures Int     @default(0)
+  healthFiring        Boolean @default(false)
+  memoryFiring        Boolean @default(false)
+
+  lastCheckedAt DateTime? @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([enabled, lastCheckedAt])
+  @@map("project_alert_settings")
+}
+
+model ProjectAlertEvent {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  kind     String  @db.VarChar(16)
+  state    String  @db.VarChar(16)
+  message  String  @db.VarChar(500)
+  notified Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, createdAt])
+  @@map("project_alert_events")
+}
+
+model ProjectGitRemote {
+  projectId String  @id @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  url      String  @db.VarChar(500)
+  username String? @db.VarChar(200)
+  token    Bytes?
+
+  lastPushedAt DateTime? @db.Timestamptz(3)
+  lastPulledAt DateTime? @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("project_git_remotes")
+}
+
+model ExecutionHostDrain {
+  hostName  String   @id @db.VarChar(32)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("execution_host_drains")
+}

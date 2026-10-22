@@ -1,0 +1,48 @@
+{
+	auto_https off
+
+	admin off
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+:8080 {
+	@proxy_health path /__proxy/health
+	handle @proxy_health {
+		header Content-Type application/json
+		respond `{"status":"ok","service":"proxy"}` 200
+	}
+
+	@preview host *.{$PREVIEW_DOMAIN:preview.localhost}
+	handle @preview {
+		header Content-Type application/json
+		respond `{"error":{"code":"RUNTIME_UNAVAILABLE","message":"Previews are not served on this port. Open the preview from the workspace, which addresses the preview listener directly."}}` 503
+	}
+
+	@deployment host *.{$DEPLOY_DOMAIN:app.localhost}
+	handle @deployment {
+		reverse_proxy {$DEPLOY_UPSTREAM:host.docker.internal:4200} {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	@api path /api/* /health/* /ws/*
+	handle @api {
+		reverse_proxy {$API_UPSTREAM:host.docker.internal:4000} {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy {$WEB_UPSTREAM:host.docker.internal:5173}
+	}
+
+	handle_errors {
+		header Content-Type application/json
+		respond `{"error":{"code":"SERVICE_UNAVAILABLE","message":"Upstream is not reachable. Is the dev server running?"}}` 502
+	}
+}
+

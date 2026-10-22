@@ -1,0 +1,78 @@
+@layer ui {
+  .ui-callout {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-2);
+    align-items: start;
+    padding: var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-3);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--text-primary);
+  }
+
+  .ui-callout__icon {
+    margin-top: 2px;
+  }
+
+  .ui-callout--info {
+    background: var(--info-bg);
+    border-color: var(--border-subtle);
+  }
+  .ui-callout--info .ui-callout__icon {
+    color: var(--info);
+  }
+
+  .ui-callout--warn {
+    background: var(--warn-bg);
+    border-color: var(--border-subtle);
+  }
+  .ui-callout--warn .ui-callout__icon {
+    color: var(--warn);
+  }
+
+  .ui-callout--danger {
+    background: var(--danger-bg);
+    border-color: var(--border-subtle);
+  }
+  .ui-callout--danger .ui-callout__icon {
+    color: var(--danger);
+  }
+
+  .ui-callout--ok {
+    background: var(--ok-bg);
+    border-color: var(--border-subtle);
+  }
+  .ui-callout--ok .ui-callout__icon {
+    color: var(--ok);
+  }
+
+  .ui-callout__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .ui-callout__title {
+    margin: 0;
+    font-weight: var(--weight-medium);
+  }
+
+  .ui-callout__text {
+    overflow-wrap: anywhere;
+  }
+
+  .ui-callout__text p {
+    margin: 0;
+  }
+
+  .ui-callout__action {
+    margin-top: var(--space-1);
+  }
+
+  .ui-callout__dismiss {
+    margin: -4px -4px 0 0;
+  }
+}

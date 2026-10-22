@@ -1,0 +1,27 @@
+@layer ui {
+  .ui-confirm__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .ui-confirm__text {
+    color: var(--text-secondary);
+  }
+
+  .ui-confirm__type {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .ui-confirm__label {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .ui-confirm__label strong {
+    font-family: var(--font-mono);
+    font-weight: var(--weight-medium);
+  }
+}

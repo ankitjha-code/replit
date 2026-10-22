@@ -1,0 +1,105 @@
+@layer feature {
+  .ui-gallery {
+    max-width: var(--width-page);
+    margin: 0 auto;
+    padding: var(--space-6) var(--gutter) var(--space-16);
+    color: var(--text-primary);
+  }
+
+  .ui-gallery__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .ui-gallery__h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: var(--leading-xl);
+    font-weight: var(--weight-semibold);
+  }
+
+  .ui-gallery__section {
+    padding: var(--space-4) 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ui-gallery__title {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .ui-gallery__body,
+  .ui-gallery__stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .ui-gallery__row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: var(--space-3);
+    align-items: start;
+  }
+
+  .ui-gallery__label {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    padding-top: 6px;
+  }
+
+  .ui-gallery__cells {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .ui-gallery__cells > .ui-input-wrap,
+  .ui-gallery__cells > .ui-disabled--block,
+  .ui-gallery__cells > .ui-select-wrap,
+  .ui-gallery__cells > .ui-textarea {
+    width: 220px;
+  }
+
+  .ui-gallery__form {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 420px;
+  }
+
+  .ui-gallery__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ui-gallery__target {
+    padding: var(--space-6);
+    border: 1px dashed var(--border-input);
+    border-radius: var(--radius-3);
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .ui-gallery__note {
+    margin-top: var(--space-6);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+
+  @media (max-width: 599px) {
+    .ui-gallery__row {
+      grid-template-columns: 1fr;
+    }
+  }
+}

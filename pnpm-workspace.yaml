@@ -1,0 +1,19 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'e2e'
+
+allowBuilds:
+  esbuild: true
+  prisma: true
+  '@prisma/engines': true # query engine binary
+  msgpackr-extract: false
+  workerd: false
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
+
+overrides:
+  dompurify: ^3.4.15
+  mysql2: ^3.24.4
+  deepmerge-ts: ^8.0.2

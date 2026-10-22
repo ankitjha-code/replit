@@ -1,0 +1,109 @@
+import { expect, test, type Browser, type Page } from '@playwright/test';
+import { signUp, uniqueIdentity } from './helpers.js';
+
+async function person(browser: Browser): Promise<{ page: Page; username: string }> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const who = uniqueIdentity();
+  await signUp(page, who);
+  return { page, username: who.username };
+}
+
+async function openFile(page: Page, projectId: string, name: string): Promise<void> {
+  await page.goto(`/projects/${projectId}`);
+  await expect(page.getByRole('region', { name: 'Files' })).toBeVisible();
+  await page.getByRole('treeitem', { name: new RegExp(name.split('.')[0]!) }).click();
+  await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 30_000 });
+}
+
+const painted = async (page: Page) =>
+  ((await page.locator('.monaco-editor .view-lines').first().textContent()) ?? '').replaceAll(
+    String.fromCharCode(0x00a0),
+    ' ',
+  );
+
+test.describe('editing together', () => {
+  test('each sees the other’s typing and caret', async ({ browser }) => {
+    const ada = await person(browser);
+    const grace = await person(browser);
+
+    const created = await ada.page.request.post('/api/projects', { data: { name: 'Together' } });
+    expect(created.status()).toBe(201);
+    const projectId = (await created.json()).project.id as string;
+
+    expect(
+      (
+        await ada.page.request.put(`/api/projects/${projectId}/files/content`, {
+          data: { path: 'notes.txt', content: 'shared\n', encoding: 'utf8' },
+        })
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await ada.page.request.post(`/api/projects/${projectId}/members`, {
+          data: { username: grace.username, role: 'EDITOR' },
+        })
+      ).status(),
+    ).toBe(201);
+
+    await openFile(ada.page, projectId, 'notes.txt');
+    await openFile(grace.page, projectId, 'notes.txt');
+
+    await expect(ada.page.getByText('Live with 1')).toBeVisible({ timeout: 15_000 });
+    await expect(grace.page.getByText('Live with 1')).toBeVisible({ timeout: 15_000 });
+
+    await ada.page.locator('.monaco-editor .view-lines').first().click();
+    await ada.page.keyboard.press('End');
+    await ada.page.keyboard.type(' from ada');
+    await expect.poll(() => painted(grace.page), { timeout: 15_000 }).toContain('from ada');
+
+    await expect(grace.page.locator('[class*="yRemoteSelectionHead-"]').first()).toBeAttached({
+      timeout: 15_000,
+    });
+
+    await grace.page.locator('.monaco-editor .view-lines').first().click();
+    await grace.page.keyboard.type('grace was here ');
+    await expect.poll(() => painted(ada.page), { timeout: 15_000 }).toContain('grace was here');
+    await expect(ada.page.locator('[class*="yRemoteSelectionHead-"]').first()).toBeAttached({
+      timeout: 15_000,
+    });
+
+    await ada.page.context().close();
+    await grace.page.context().close();
+  });
+
+  test('one person alone is saved by the platform, not by the editor', async ({ browser }) => {
+    const ada = await person(browser);
+    const created = await ada.page.request.post('/api/projects', { data: { name: 'Solo' } });
+    const projectId = (await created.json()).project.id as string;
+    await ada.page.request.put(`/api/projects/${projectId}/files/content`, {
+      data: { path: 'solo.txt', content: 'start', encoding: 'utf8' },
+    });
+
+    await openFile(ada.page, projectId, 'solo.txt');
+    await expect(ada.page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(ada.page.getByText(/^Live with/)).toHaveCount(0);
+    await expect(ada.page.getByRole('button', { name: 'Save now' })).toBeDisabled();
+
+    await ada.page.locator('.monaco-editor .view-lines').first().click();
+    await ada.page.keyboard.press('End');
+    await ada.page.keyboard.type(' and more');
+
+    await expect(ada.page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(
+        async () =>
+          (
+            await (
+              await ada.page.request.get(`/api/projects/${projectId}/files/content`, {
+                params: { path: 'solo.txt' },
+              })
+            ).json()
+          ).content as string,
+        { timeout: 15_000 },
+      )
+      .toBe('start and more');
+
+    await ada.page.context().close();
+  });
+});

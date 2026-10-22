@@ -1,0 +1,44 @@
+import { joinPath, parentOf, type FileEntry } from '@platform/shared';
+import { fetchFileContent } from '../../lib/files-api.js';
+
+export function copyPathFor(path: string, entries: readonly FileEntry[]): string {
+  const taken = new Set(entries.map((entry) => entry.path));
+  const directory = parentOf(path);
+  const name = path.split('/').pop() ?? path;
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : '';
+
+  for (let attempt = 1; ; attempt++) {
+    const suffix = attempt === 1 ? ' copy' : ` copy ${attempt}`;
+    const candidate = joinPath(directory, `${stem}${suffix}${extension}`);
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+export function moveTargets(path: string, entries: readonly FileEntry[]): string[] {
+  const current = parentOf(path);
+  const folders = entries
+    .filter((entry) => entry.type === 'DIRECTORY')
+    .map((entry) => entry.path)
+    .filter((folder) => folder !== path && !folder.startsWith(`${path}/`));
+  return ['', ...folders].filter((folder) => folder !== current);
+}
+
+export async function saveToDevice(projectId: string, path: string): Promise<void> {
+  const file = await fetchFileContent(projectId, path);
+  const blob =
+    file.encoding === 'base64'
+      ? new Blob([Uint8Array.from(atob(file.content), (char) => char.charCodeAt(0))])
+      : new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = path.split('/').pop() ?? path;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

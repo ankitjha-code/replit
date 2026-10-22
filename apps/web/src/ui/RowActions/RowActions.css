@@ -1,0 +1,17 @@
+@layer ui {
+  .ui-row-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    flex: none;
+  }
+
+  .ui-row-actions__danger {
+    color: var(--danger);
+  }
+
+  .ui-row-actions__danger:hover {
+    color: var(--danger);
+  }
+}
