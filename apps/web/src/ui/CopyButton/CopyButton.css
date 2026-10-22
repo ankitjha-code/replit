@@ -1,0 +1,9 @@
+@layer ui {
+  .ui-copy-button--copied {
+    color: var(--ok);
+  }
+
+  .ui-copy-button--copied:hover {
+    color: var(--ok);
+  }
+}

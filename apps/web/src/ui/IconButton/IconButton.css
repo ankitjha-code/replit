@@ -1,0 +1,21 @@
+@layer ui {
+  .ui-button--icon {
+    width: var(--control-h-md);
+    padding: 0;
+    flex: none;
+  }
+
+  .ui-button--icon.ui-button--sm {
+    width: var(--control-h-sm);
+  }
+
+  .ui-button--icon.ui-button--lg {
+    width: var(--control-h-lg);
+  }
+
+  @media (max-width: 767px) {
+    .ui-button--icon {
+      min-width: var(--control-h-touch);
+    }
+  }
+}

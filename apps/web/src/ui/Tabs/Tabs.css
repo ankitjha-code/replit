@@ -1,0 +1,102 @@
+@layer ui {
+  .ui-tabs {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .ui-tabs__list {
+    display: flex;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ui-tabs--line .ui-tabs__list {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .ui-tabs__tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--control-h-lg);
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-2) var(--radius-2) 0 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .ui-tabs__tab:hover {
+    color: var(--text-primary);
+    background-image: linear-gradient(var(--bg-hover), var(--bg-hover));
+  }
+
+  .ui-tabs__tab[data-state='active'] {
+    color: var(--text-primary);
+  }
+
+  .ui-tabs--line .ui-tabs__tab::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: transparent;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+
+  .ui-tabs--line .ui-tabs__tab[data-state='active']::after {
+    background: var(--accent);
+  }
+
+  .ui-tabs--segmented .ui-tabs__list {
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2);
+    background: var(--bg-canvas);
+    align-self: flex-start;
+  }
+
+  .ui-tabs--segmented .ui-tabs__tab {
+    height: var(--control-h-md);
+    border-radius: var(--radius-1);
+  }
+
+  .ui-tabs--segmented .ui-tabs__tab[data-state='active'] {
+    background: var(--bg-raised);
+    box-shadow: 0 0 0 1px var(--border-strong);
+  }
+
+  .ui-tabs__tab:disabled {
+    color: var(--text-disabled);
+    cursor: not-allowed;
+  }
+
+  .ui-tabs__tab:focus-visible {
+    z-index: 1;
+    box-shadow:
+      0 0 0 2px var(--bg-base),
+      0 0 0 4px var(--focus);
+  }
+
+  .ui-tabs__panel {
+    min-width: 0;
+  }
+
+  .ui-tabs__panel:focus-visible {
+    box-shadow: none;
+  }
+}

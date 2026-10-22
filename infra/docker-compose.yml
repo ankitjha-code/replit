@@ -1,0 +1,174 @@
+name: replit-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-platform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-platform}
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5442}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-platform} -d ${POSTGRES_DB:-platform}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - platform
+
+  userdb:
+    image: postgres:17-alpine
+    container_name: platform-userdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USER_DATABASE_ADMIN_USER:-userdb_admin}
+      POSTGRES_PASSWORD: ${USER_DATABASE_ADMIN_PASSWORD:-userdb_dev_only}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      - '127.0.0.1:${USER_DATABASE_PORT:-5452}:5432'
+    volumes:
+      - userdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${USER_DATABASE_ADMIN_USER:-userdb_admin} -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - runtimes
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: platform-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-platform}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-platform_dev_only}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-9101}
+    ports:
+      - '127.0.0.1:${MINIO_API_PORT:-9100}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9101}:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - platform
+
+  minio-init:
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+    profiles: ['init']
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-platform-assets}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-platform}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-platform_dev_only}
+    entrypoint: ['/bin/sh', '/init/create-bucket.sh']
+    volumes:
+      - ./minio/create-bucket.sh:/init/create-bucket.sh:ro
+    restart: 'no'
+    networks:
+      - platform
+
+  proxy:
+    image: caddy:2.11-alpine
+    container_name: platform-proxy
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${PROXY_HTTP_PORT:-8080}:8080'
+    environment:
+      API_UPSTREAM: ${PROXY_API_UPSTREAM:-host.docker.internal:4000}
+      WEB_UPSTREAM: ${PROXY_WEB_UPSTREAM:-host.docker.internal:5173}
+      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:-preview.localhost}
+      DEPLOY_DOMAIN: ${DEPLOY_DOMAIN:-app.localhost}
+      DEPLOY_UPSTREAM: ${PROXY_DEPLOY_UPSTREAM:-host.docker.internal:4200}
+      PROXY_HTTP_PORT: ${PROXY_HTTP_PORT:-8080}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8080/__proxy/health']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - platform
+
+  redis:
+    image: redis:7-alpine
+    container_name: platform-redis
+    profiles: ['queue']
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6389}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - platform
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: platform-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: '500'
+      MP_SMTP_AUTH_ACCEPT_ANY: '1'
+      MP_SMTP_AUTH_ALLOW_INSECURE: '1'
+    ports:
+      - '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - platform
+
+volumes:
+  postgres_data:
+    name: platform_postgres_data
+  userdb_data:
+    name: platform_userdb_data
+  minio_data:
+    name: platform_minio_data
+  redis_data:
+    name: platform_redis_data
+  caddy_data:
+    name: platform_caddy_data
+  caddy_config:
+    name: platform_caddy_config
+
+networks:
+  platform:
+    name: platform_net
+    driver: bridge
+
+  runtimes:
+    name: ${RUNTIME_NETWORK:-platform-runtimes}
+    driver: bridge

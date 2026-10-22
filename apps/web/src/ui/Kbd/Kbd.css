@@ -1,0 +1,24 @@
+@layer ui {
+  .ui-kbd {
+    display: inline-flex;
+    gap: 2px;
+    vertical-align: middle;
+    font-family: var(--font-ui);
+    font-size: var(--text-2xs);
+    line-height: 1;
+    color: var(--text-muted);
+  }
+
+  .ui-kbd__key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-1);
+    background: var(--bg-raised);
+    font-weight: var(--weight-medium);
+  }
+}

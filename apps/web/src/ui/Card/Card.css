@@ -1,0 +1,45 @@
+@layer ui {
+  .ui-card {
+    display: block;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-3);
+    background: var(--bg-raised);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .ui-card--pad-none {
+    padding: 0;
+  }
+  .ui-card--pad-sm {
+    padding: var(--space-3);
+  }
+  .ui-card--pad-md {
+    padding: var(--space-4);
+  }
+  .ui-card--pad-lg {
+    padding: var(--space-6);
+  }
+
+  .ui-card--danger {
+    border-color: var(--danger);
+  }
+
+  .ui-card--interactive {
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .ui-card--interactive:hover {
+    border-color: var(--border-input);
+    background-image: linear-gradient(var(--bg-hover), var(--bg-hover));
+  }
+
+  .ui-card--interactive:focus-visible {
+    box-shadow:
+      0 0 0 2px var(--bg-base),
+      0 0 0 4px var(--focus);
+  }
+}

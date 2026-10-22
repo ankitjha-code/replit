@@ -1,0 +1,119 @@
+@layer ui {
+  .ui-menu {
+    z-index: var(--z-popover);
+    min-width: 180px;
+    max-width: 320px;
+    max-height: var(--radix-dropdown-menu-content-available-height, 80vh);
+    overflow: auto;
+    padding: var(--space-1);
+    border-radius: var(--radius-3);
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-2);
+    font-family: var(--font-ui);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    animation: ui-menu-in var(--duration-base) var(--ease-standard);
+    outline: none;
+  }
+
+  .ui-menu__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-h-md);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-2);
+    color: inherit;
+    text-decoration: none;
+    cursor: default;
+    user-select: none;
+    outline: none;
+  }
+
+  .ui-menu__item[data-highlighted] {
+    background: var(--bg-hover);
+  }
+
+  .ui-menu__item[data-disabled] {
+    color: var(--text-disabled);
+  }
+
+  .ui-menu__item--danger {
+    color: var(--danger);
+  }
+
+  .ui-menu__icon,
+  .ui-menu__check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+  }
+
+  .ui-menu__item--danger .ui-menu__icon {
+    color: inherit;
+  }
+
+  .ui-menu__item[data-state='checked'] .ui-menu__check {
+    color: var(--accent-text);
+  }
+
+  .ui-menu__text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ui-menu__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ui-menu__reason {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    white-space: normal;
+  }
+
+  .ui-menu__shortcut {
+    margin-left: var(--space-3);
+  }
+
+  .ui-menu__caret {
+    color: var(--text-muted);
+  }
+
+  .ui-menu__heading {
+    padding: var(--space-1) var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  .ui-menu__separator {
+    height: 1px;
+    margin: var(--space-1) calc(-1 * var(--space-1));
+    background: var(--border-subtle);
+  }
+
+  @keyframes ui-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

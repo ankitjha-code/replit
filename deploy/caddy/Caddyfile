@@ -1,0 +1,68 @@
+{
+	admin off
+	import /etc/caddy/tls-{$TLS_MODE:acme}.caddy
+	ocsp_stapling off
+
+	on_demand_tls {
+		ask http://{$UPSTREAM_HOST}:{$API_PORT:4000}/internal/tls-authorize
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+(proxy_headers) {
+	header_up X-Real-IP {remote_host}
+}
+
+{$PLATFORM_DOMAIN} {
+	encode zstd gzip
+
+	@internal path /internal/* /metrics /metrics/*
+	handle @internal {
+		respond 404
+	}
+
+	@api path /api/* /health/* /ws/*
+	handle @api {
+		reverse_proxy {$UPSTREAM_HOST}:{$API_PORT:4000} {
+			import proxy_headers
+		}
+	}
+
+	handle {
+		root * /srv/web
+		header {
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options nosniff
+			Referrer-Policy no-referrer
+			X-Frame-Options DENY
+			Content-Security-Policy "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://{$PLATFORM_DOMAIN}; frame-src https://*.{$PREVIEW_DOMAIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		}
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+
+	@preview host *.{$PREVIEW_DOMAIN}
+	handle @preview {
+		reverse_proxy {$UPSTREAM_HOST}:{$PREVIEW_PORT:4100} {
+			import proxy_headers
+		}
+	}
+
+	handle {
+		reverse_proxy {$UPSTREAM_HOST}:{$DEPLOYMENT_PORT:4200} {
+			import proxy_headers
+		}
+	}
+}

@@ -1,0 +1,54 @@
+@layer ui {
+  .ui-meter {
+    display: grid;
+    grid-template-columns: var(--ui-meter-label, minmax(6rem, max-content)) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--text-secondary);
+  }
+
+  .ui-meter__label {
+    font-weight: var(--weight-medium);
+  }
+
+  .ui-meter__track {
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--bg-active);
+    overflow: hidden;
+  }
+
+  .ui-meter__track--loading {
+    grid-column: 2 / -1;
+    animation: ui-skeleton-pulse 1400ms var(--ease-standard) infinite;
+  }
+
+  .ui-meter__fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    transition: width var(--duration-slow) var(--ease-standard);
+  }
+
+  .ui-meter--warn .ui-meter__fill {
+    background: var(--warn);
+  }
+
+  .ui-meter--danger .ui-meter__fill {
+    background: var(--danger);
+  }
+
+  .ui-meter__value {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-meter__track--loading {
+      animation: none;
+    }
+  }
+}
